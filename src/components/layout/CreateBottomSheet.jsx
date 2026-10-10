@@ -14,7 +14,7 @@ function CreateBottomSheet({ onClose }) {
           className="w-full justify-start"
           onClick={onClose}
         >
-          플레이리스트
+          플레이리스트 만들기
         </Button>
 
         <Button
