@@ -34,3 +34,16 @@
     cursor: pointer;
   }
 }
+
+/* 스크롤 기능은 유지하고 스크롤바만 숨기기 */
+html,
+body,
+#root {
+  scrollbar-width: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+  display: none;
+}
