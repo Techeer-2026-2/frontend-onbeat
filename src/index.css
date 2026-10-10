@@ -1,1 +1,36 @@
 @import "tailwindcss";
+
+@theme {
+    --color-spotify-green: #1DB954;         /* Spotify 그린 */
+    --color-spotify-green-hover: #1ed760;
+
+    --color-spotify-black: #121212;         /* 기본 배경 */
+    --color-spotify-dark: #181818;          /* 영역 배경 */
+    --color-spotify-card: #282828;          /* 카드 배경 */
+    --color-spotify-card-hover: #3E3E3E;    
+
+    --color-spotify-subtext: #B3B3B3;        /* 보조 텍스트 */
+    --color-spotify-border: #2A2A2A;         /* 테두리 */
+
+    --color-spotify-accent-blue: #007AFF;    /* 강조 파랑 */
+    --color-spotify-accent-orange: #FF9500;  /* 강조 오렌지 */
+}
+
+@layer base {
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background-color: #121212;
+    color: #FFFFFF;
+    font-family: Arial, sans-serif;
+  }
+
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
