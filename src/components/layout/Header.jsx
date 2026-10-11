@@ -20,7 +20,7 @@ function Header() {
   }
 
   return (
-    <header className="flex items-center gap-3 border-b border-white/10 bg-spotify-black px-5 py-4">
+    <header className="flex items-center gap-3 bg-spotify-black px-5 pt-4 pb-0">
       <IconButton
         label="프로필"
         onClick={() => console.log('프로필 클릭')}
