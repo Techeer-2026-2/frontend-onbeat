@@ -1,5 +1,486 @@
+import { useState } from 'react';
+import {
+  MapPin,
+  Navigation,
+  LocateFixed,
+  Clock3,
+  TrainFront,
+  Bus,
+  Footprints,
+  CarFront,
+  Music2,
+  Play,
+  Square,
+  SlidersHorizontal,
+  X,
+  ArrowRight,
+} from 'lucide-react';
+
+import Button from '../components/common/Button';
+import Card from '../components/common/Card';
+import Badge from '../components/common/Badge';
+import IconButton from '../components/common/IconButton';
+
+const transitModes = [
+  { id: 'subway', label: '지하철', icon: TrainFront },
+  { id: 'bus', label: '버스', icon: Bus },
+  { id: 'walk', label: '도보', icon: Footprints },
+  { id: 'car', label: '자동차', icon: CarFront },
+];
+
+// 목업 경로 데이터. API 연동 시에도 같은 형태의 좌표 데이터로 교체할 수 있어요.
+// x/y는 목업 좌표이며, 실제 API 데이터는 longitude/latitude를 사용할 수 있습니다.
+const stations = [
+  { name: '강남역', x: 16, y: 24 },
+  { name: '역삼역', x: 33, y: 38 },
+  { name: '선릉역', x: 50, y: 52 },
+  { name: '삼성역', x: 67, y: 66 },
+  { name: '판교역', x: 84, y: 81 },
+];
+
+/**
+ * 경로 좌표를 SVG의 0~100 좌표계로 정규화합니다.
+ * - 목업의 x/y 좌표와 API의 longitude/latitude 좌표를 모두 처리합니다.
+ * - padding 값으로 경로 주변 여백을 한 번에 조절합니다.
+ * - 역 마커와 SVG 노선이 같은 결과 좌표를 사용하도록 합니다.
+ * 실제 지도 SDK를 도입하면 SDK의 좌표 변환 결과를 사용해야 합니다.
+ */
+function normalizeRouteCoordinates(
+  points,
+  padding = { x: 18, y: 20 }
+) {
+  if (!points?.length) return [];
+
+  const coordinates = points.map((point) => ({
+    ...point,
+    sourceX: Number(point.x ?? point.longitude),
+    sourceY: Number(point.y ?? point.latitude),
+  }));
+
+  if (
+    coordinates.some(
+      ({ sourceX, sourceY }) =>
+        !Number.isFinite(sourceX) || !Number.isFinite(sourceY)
+    )
+  ) {
+    return [];
+  }
+
+  const xValues = coordinates.map((point) => point.sourceX);
+  const yValues = coordinates.map((point) => point.sourceY);
+  const minX = Math.min(...xValues);
+  const maxX = Math.max(...xValues);
+  const minY = Math.min(...yValues);
+  const maxY = Math.max(...yValues);
+
+  // 가로와 세로의 여백을 따로 설정해 역 표시 구역 안쪽에 공간을 둡니다.
+  const usableWidth = 100 - padding.x * 2;
+  const usableHeight = 100 - padding.y * 2;
+
+  // 한 축의 좌표가 모두 같을 때 0으로 나누는 문제를 방지합니다.
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+
+  return coordinates.map((point) => ({
+    ...point,
+    x: padding.x + ((point.sourceX - minX) / rangeX) * usableWidth,
+    y: padding.y + ((point.sourceY - minY) / rangeY) * usableHeight,
+  }));
+}
+
+// 노선 주변 여백. 값이 커질수록 역들이 표시 구역 중앙으로 모입니다.
+const ROUTE_PADDING = { x: 18, y: 22 };
+
 function Map() {
-  return <div>Map</div>;
+  const [isRouteConfigured, setIsRouteConfigured] = useState(false);
+  const [origin, setOrigin] = useState('강남역');
+  const [destination, setDestination] = useState('판교역');
+  const [transitMode, setTransitMode] = useState('subway');
+  const [isEditingRoute, setIsEditingRoute] = useState(false);
+  const [isCommuting, setIsCommuting] = useState(false);
+
+  const selectedMode = transitModes.find(
+    (mode) => mode.id === transitMode
+  ) ?? transitModes[0];
+
+  const TransitIcon = selectedMode.icon;
+  const normalizedStations = normalizeRouteCoordinates(stations, ROUTE_PADDING);
+  const routeLinePoints = normalizedStations
+    .map((station) => `${station.x},${station.y}`)
+    .join(' ');
+
+  const handleSaveRoute = () => {
+    if (!origin.trim() || !destination.trim()) {
+      alert('출발역과 도착역을 모두 입력해 주세요.');
+      return;
+    }
+
+    setIsRouteConfigured(true);
+    setIsEditingRoute(false);
+    setIsCommuting(false);
+  };
+
+  const handleToggleCommute = () => {
+    setIsCommuting((previous) => !previous);
+  };
+
+  return (
+    <div className="space-y-5 px-4 pb-6 pt-4">
+      {/* 페이지 헤더 */}
+      <section className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-spotify-green text-black">
+            <MapPin size={26} fill="currentColor" />
+          </div>
+
+          <h1 className="text-2xl font-bold text-white">
+            통근 지도
+          </h1>
+        </div>
+
+        {isRouteConfigured && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsEditingRoute(true)}
+          >
+            <span className="flex items-center gap-2">
+              <SlidersHorizontal size={16} />
+              경로 관리
+            </span>
+          </Button>
+        )}
+      </section>
+
+      {/* 통근 경로 미설정 화면 */}
+      {!isRouteConfigured ? (
+        <Card padding="lg" className="mt-8">
+          <div className="flex flex-col items-center py-12 text-center">
+            <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-spotify-green/10">
+              <Navigation
+                size={38}
+                className="text-spotify-green"
+              />
+            </div>
+
+            <h2 className="mb-2 text-xl font-bold text-white">
+              아직 등록된 통근 경로가 없어요
+            </h2>
+
+            <p className="mb-7 max-w-xs text-sm leading-6 text-spotify-subtext">
+              출발지와 도착지를 설정하고
+              <br />
+              나에게 맞는 통근길 플레이리스트를 만나보세요.
+            </p>
+
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => setIsEditingRoute(true)}
+            >
+              <span className="flex items-center gap-2">
+                <MapPin size={18} />
+                통근 경로 설정하기
+              </span>
+            </Button>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {/* 통근 경로 요약: 모든 정보를 한 줄에 배치 */}
+          <Card padding="md">
+            <div className="flex items-center justify-between gap-2">
+              {/* 왼쪽: 통근 상태 + 출발역 → 도착역 */}
+              <div className="flex min-w-0 items-center gap-2">
+                <Badge
+                  variant={isCommuting ? 'warning' : 'primary'}
+                  size="sm"
+                  className="shrink-0"
+                >
+                  {isCommuting ? '통근 중' : '통근 전'}
+                </Badge>
+
+                <span className="min-w-0 truncate text-sm font-bold text-white">
+                  {origin} → {destination}
+                </span>
+              </div>
+
+              {/* 오른쪽: 교통수단 + 소요 시간 */}
+              <div className="flex shrink-0 items-center gap-1.5 text-sm text-spotify-subtext">
+                <TransitIcon
+                  size={17}
+                  className="shrink-0 text-spotify-green"
+                />
+
+                <span>{selectedMode.label}</span>
+                <span>·</span>
+
+                <Clock3 size={15} className="shrink-0" />
+
+                <span>32분</span>
+              </div>
+            </div>
+
+            {/* 통근 중일 때만 진행 상황 표시 */}
+            {isCommuting && (
+              <div className="mt-5 space-y-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-spotify-green">
+                    현재: 선릉역
+                  </span>
+
+                  <span className="shrink-0 text-spotify-subtext">
+                    남은 시간: 16분 (50%)
+                  </span>
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full w-1/2 rounded-full bg-spotify-green" />
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* 지도 영역: GPS / 노선 / 예상 소요 시간의 3개 구역 */}
+          <div className="relative isolate flex flex-col gap-3 overflow-hidden rounded-3xl border border-white/10 bg-[#151c1a] p-4">
+            {/* 점선 그리드 배경 */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 -z-10 opacity-40"
+              style={{
+                backgroundImage:
+                  'radial-gradient(circle, #35413d 1px, transparent 1.5px)',
+                backgroundSize: '20px 20px',
+              }}
+            />
+
+            {/* 1. GPS 상태 + 현재 위치 버튼 */}
+            <div className="relative z-10 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2 rounded-xl bg-black/90 px-3 py-2 text-xs text-white">
+                <span className="h-2 w-2 shrink-0 rounded-full bg-spotify-green" />
+                <span>GPS 위치 추적 모의 화면</span>
+              </div>
+
+              <IconButton
+                label="현재 위치"
+                className="shrink-0 bg-spotify-dark"
+                onClick={() => console.log('현재 위치 버튼 클릭')}
+              >
+                <LocateFixed
+                  size={20}
+                  className="text-spotify-green"
+                />
+              </IconButton>
+            </div>
+
+            {/* 2. 노선 표시 영역: 높이를 줄이고 내부 여백을 확보 */}
+            <div className="relative h-44 w-full">
+              {/* SVG와 역 마커를 같은 안쪽 영역에 배치해 좌표를 일치시킵니다. */}
+              <svg
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+                className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)]"
+                aria-label={`${origin}에서 ${destination}까지의 통근 경로`}
+              >
+                <polyline
+                  points={routeLinePoints}
+                  fill="none"
+                  stroke="#1DB954"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray="2 2"
+                />
+              </svg>
+            </div>
+
+            {/* 3. 예상 소요 시간 카드 */}
+            <div className="relative z-10 flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/90 p-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <Clock3
+                  size={22}
+                  className="shrink-0 text-spotify-green"
+                />
+
+                <div>
+                  <p className="text-xs text-spotify-subtext">
+                    예상 소요 시간
+                  </p>
+
+                  <p className="mt-1 text-sm font-bold text-white">
+                    32분 · {selectedMode.label}
+                  </p>
+                </div>
+              </div>
+
+              <Badge variant="primary" className="shrink-0">
+                8곡 재생 예정
+              </Badge>
+            </div>
+          </div>
+
+          {/* 통근길 플레이리스트 */}
+          <Card padding="md" hoverable>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 text-left"
+              onClick={() =>
+                console.log('통근길 플레이리스트 클릭')
+              }
+            >
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-spotify-green text-black">
+                <Music2 size={28} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h2 className="truncate font-bold text-white">
+                  32분 맞춤 출근길 플레이리스트
+                </h2>
+
+                <p className="mt-1 text-sm text-spotify-subtext">
+                  통근 시간에 맞춘 8곡
+                </p>
+              </div>
+
+              <ArrowRight
+                size={22}
+                className="shrink-0 text-white"
+              />
+            </button>
+          </Card>
+
+          {/* 통근 시작 / 중단 */}
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={handleToggleCommute}
+          >
+            <span className="flex items-center justify-center gap-2">
+              {isCommuting ? (
+                <Square size={18} fill="currentColor" />
+              ) : (
+                <Play size={20} fill="currentColor" />
+              )}
+
+              {isCommuting ? '통근 중단' : '출근 시작'}
+            </span>
+          </Button>
+        </>
+      )}
+
+      {/* 경로 설정 모달 */}
+      {isEditingRoute && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 sm:items-center"
+          onClick={() => setIsEditingRoute(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl border border-white/10 bg-spotify-dark p-6 sm:rounded-3xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">
+                통근 경로 설정
+              </h2>
+
+              <IconButton
+                label="닫기"
+                onClick={() => setIsEditingRoute(false)}
+              >
+                <X size={22} />
+              </IconButton>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label
+                  htmlFor="origin"
+                  className="mb-2 block text-sm text-spotify-subtext"
+                >
+                  출발역
+                </label>
+
+                <input
+                  id="origin"
+                  value={origin}
+                  onChange={(event) => setOrigin(event.target.value)}
+                  placeholder="출발역을 입력하세요"
+                  className="w-full rounded-xl border border-white/10 bg-spotify-black px-4 py-3 text-white outline-none focus:border-spotify-green"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="destination"
+                  className="mb-2 block text-sm text-spotify-subtext"
+                >
+                  도착역
+                </label>
+
+                <input
+                  id="destination"
+                  value={destination}
+                  onChange={(event) =>
+                    setDestination(event.target.value)
+                  }
+                  placeholder="도착역을 입력하세요"
+                  className="w-full rounded-xl border border-white/10 bg-spotify-black px-4 py-3 text-white outline-none focus:border-spotify-green"
+                />
+              </div>
+
+              <div>
+                <p className="mb-3 text-sm text-spotify-subtext">
+                  이동 수단
+                </p>
+
+                <div className="grid grid-cols-4 gap-2">
+                  {transitModes.map((mode) => {
+                    const ModeIcon = mode.icon;
+                    const isSelected = transitMode === mode.id;
+
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setTransitMode(mode.id)}
+                        className={`flex flex-col items-center gap-2 rounded-xl border p-3 text-xs transition ${
+                          isSelected
+                            ? 'border-spotify-green bg-spotify-green/10 text-spotify-green'
+                            : 'border-white/10 text-spotify-subtext hover:bg-white/5'
+                        }`}
+                      >
+                        <ModeIcon size={22} />
+                        <span>{mode.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-7 flex gap-3">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setIsEditingRoute(false)}
+              >
+                취소
+              </Button>
+
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={handleSaveRoute}
+              >
+                경로 저장
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default Map;
