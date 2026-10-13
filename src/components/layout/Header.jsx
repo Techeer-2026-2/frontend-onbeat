@@ -5,6 +5,7 @@ const PAGE_TITLES = {
   '/home': 'ONBEAT',
   '/search': '검색',
   '/library': '내 라이브러리',
+  '/playlist/create': '플레이리스트 만들기',
 };
 
 function Header() {
@@ -14,8 +15,8 @@ function Header() {
   // 현재 페이지에 맞는 헤더 제목 결정
   const title = PAGE_TITLES[pathname];
 
-  // 지도 탭은 별도 헤더를 사용
-  if (pathname === '/map') {
+  // 플레이리스트 탭은 별도 헤더를 사용
+  if (pathname === '/playlist/create' || pathname === '/playlist/commute/create') {
     return null;
   }
 
