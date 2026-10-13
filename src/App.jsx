@@ -5,6 +5,8 @@ import Home from './pages/Home';
 import Search from './pages/Search';
 import Library from './pages/Library';
 import Map from './pages/Map';
+import PlaylistCreate from './pages/PlaylistCreate';
+import CommutePlaylistCreate from './pages/CommutePlaylistCreate';
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
           <Route path="search" element={<Search />} />
           <Route path="library" element={<Library />} />
           <Route path="map" element={<Map />} />
+          <Route path="playlist/create" element={<PlaylistCreate />} />
+          <Route path="playlist/commute/create" element={<CommutePlaylistCreate />} />
         </Route>
       </Routes>
     </BrowserRouter>
