@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import Layout from './components/layout/Layout';
-
 import Home from './pages/Home';
 import Search from './pages/Search';
 import Library from './pages/Library';
