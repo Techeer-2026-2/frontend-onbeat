@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Heart,
   ListMusic,
@@ -75,14 +76,33 @@ const filters = [
 ];
 
 function Library() {
+  const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  const savedPlaylistItems = useMemo(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
+      return saved.map((playlist) => ({
+        id: playlist.id,
+        title: playlist.title,
+        subtitle: playlist.description || `내 플레이리스트 · ${playlist.tracks?.length || 0}곡`,
+        type: 'playlist',
+        image: playlist.cover || playlist.tracks?.[0]?.image || null,
+        icon: 'playlist',
+        count: `${playlist.tracks?.length || 0}곡`,
+      }));
+    } catch {
+      return [];
+    }
+  }, []);
+
   const visibleItems = useMemo(() => {
+    const allItems = [...savedPlaylistItems, ...libraryItems];
     const normalizedQuery = query.trim().toLowerCase();
 
-    return libraryItems.filter((item) => {
+    return allItems.filter((item) => {
       const matchesFilter =
         activeFilter === 'all' || item.type === activeFilter;
 
@@ -93,15 +113,17 @@ function Library() {
 
       return matchesFilter && matchesQuery;
     });
-  }, [activeFilter, query]);
+  }, [activeFilter, query, savedPlaylistItems]);
 
   const handleItemClick = (item) => {
+    if (item.id?.startsWith('playlist-')) {
+      navigate('/playlist/create');
+      return;
+    }
     console.log('라이브러리 항목 선택:', item.title);
   };
 
-  const handleCreatePlaylist = () => {
-    console.log('플레이리스트 만들기');
-  };
+  const handleCreatePlaylist = () => navigate('/playlist/create');
 
   const renderItemIcon = (item) => {
     if (item.icon === 'heart') {
