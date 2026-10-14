@@ -17,18 +17,7 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
-
-const libraryItems = [
-  {
-    id: 'liked',
-    title: '좋아요 표시한 곡',
-    subtitle: '내가 좋아요를 누른 음악',
-    type: 'playlist',
-    image: null,
-    icon: 'heart',
-    count: '8곡',
-  },
-];
+import { libraryItems } from '../mocks/content';
 
 const filters = [
   { label: '전체', value: 'all' },
@@ -62,7 +51,7 @@ function Library() {
   const savedPlaylistItems = useMemo(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
-      return saved.map((playlist) => ({
+      return saved.filter((playlist) => !isCommutePlaylist(playlist)).map((playlist) => ({
         id: playlist.id,
         title: playlist.title,
         subtitle: playlist.description || `내 플레이리스트 · ${playlist.tracks?.length || 0}곡`,
@@ -76,7 +65,7 @@ function Library() {
     }
   }, []);
 
-  const serverPlaylistItems = useMemo(() => serverPlaylists.map((playlist) => ({
+  const serverPlaylistItems = useMemo(() => serverPlaylists.filter((playlist) => !isCommutePlaylist(playlist)).map((playlist) => ({
     id: String(playlist.id),
     title: playlist.name,
     subtitle: '내 플레이리스트',
@@ -304,3 +293,9 @@ function Library() {
 }
 
 export default Library;
+
+function isCommutePlaylist(playlist) {
+  return playlist?.isCommute === true
+    || playlist?.type === 'commute'
+    || /^출근 맞춤 플레이리스트/.test(playlist?.name ?? playlist?.title ?? '');
+}

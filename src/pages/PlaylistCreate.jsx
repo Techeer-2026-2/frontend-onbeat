@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { generateCustomPlaylist } from '../api/playlists';
+import { useQueryClient } from '@tanstack/react-query';
+import { addTracksToPlaylist, generateCustomPlaylist } from '../api/playlists';
+import { playlistTracks as MASTER_TRACKS } from '../mocks/tracks';
 import {
   ArrowLeft, Check, ChevronDown, Globe, ListMusic, Plus, Search, Share2,
   Music2, X, Trash2, Play,
@@ -15,19 +16,14 @@ function PlaylistCreate() {
   const queryClient = useQueryClient();
   const rawMemberId = import.meta.env.VITE_TEST_MEMBER_ID;
   const memberId = rawMemberId ? Number(rawMemberId) : undefined;
-  const createMutation = useMutation({
-    mutationFn: ({ memberId, name }) =>
-      generateCustomPlaylist(memberId, { name }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['playlists'] });
-    },
-  });
   const [title, setTitle] = useState('내 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [query, setQuery] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [notice, setNotice] = useState('');
   const [cover, setCover] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [createdPlaylist, setCreatedPlaylist] = useState(null);
   const totalSec = tracks.reduce((sum, t) => sum + t.durationSec, 0);
   const available = useMemo(() => MASTER_TRACKS.filter(t => !tracks.some(added => added.id === t.id)).slice(0, 5), [tracks]);
   const results = useMemo(() => {
@@ -52,39 +48,91 @@ function PlaylistCreate() {
     const value = window.prompt('플레이리스트 이름을 입력하세요:', title);
     if (value?.trim()) setTitle(value.trim());
   };
-  const save = () => {
+  const save = async () => {
+    if (isSaving) return;
     if (!title.trim()) return setNotice('플레이리스트 이름을 입력해 주세요.');
     if (!Number.isSafeInteger(memberId) || memberId <= 0) {
       setNotice('.env.local에 유효한 VITE_TEST_MEMBER_ID를 설정해 주세요.');
       return;
     }
 
-    createMutation.mutate(
-      { memberId, name: title.trim() },
-      {
-        onSuccess: (result) => {
-          const playlist = {
-            ...result,
-            id: result?.id ?? `playlist-${Date.now()}`,
-            title: result?.name ?? title.trim(),
-            tracks,
-            totalSeconds: totalSec,
-            cover: cover || tracks[0]?.art || '',
-            createdAt: new Date().toISOString(),
-            type: 'playlist',
-            isCommute: false,
-          };
-          const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
-          localStorage.setItem('onbeat-playlists', JSON.stringify([playlist, ...saved]));
-          setNotice('플레이리스트가 저장되었습니다.');
-          navigate('/library', { state: { createdPlaylist: playlist } });
-        },
-        onError: (error) => {
-          const message = error?.response?.data?.message;
-          setNotice(message || '플레이리스트 생성에 실패했어요. API 요청값과 서버 로그를 확인해 주세요.');
-        },
+    setIsSaving(true);
+    try {
+      // Keep a successfully created playlist so retrying a failed track request never creates a duplicate.
+      let pending = createdPlaylist;
+      if (!pending) {
+        let result;
+        try {
+          result = await generateCustomPlaylist({ name: title.trim() });
+        } catch (error) {
+          console.error('Playlist creation failed:', error);
+          setNotice(error?.response?.data?.message || '플레이리스트 생성에 실패했어요.');
+          return;
+        }
+        const payload = result?.data ?? result?.playlist ?? result;
+        const playlistId = payload?.id ?? payload?.playlistId;
+        if (playlistId == null) {
+          console.error('Playlist creation response did not include an ID:', result);
+          setNotice('플레이리스트는 생성됐지만 서버 응답에서 ID를 확인하지 못했어요. 중복 생성을 막기 위해 다시 생성하지 말고 서버 목록을 확인해 주세요.');
+          return;
+        }
+        pending = { id: playlistId, result: payload };
+        setCreatedPlaylist(pending);
+        await queryClient.invalidateQueries({ queryKey: ['playlists'] });
       }
-    );
+
+      if (tracks.length) {
+        const dtoTracks = tracks.map((track) => {
+          // Test-only mapping for the local MASTER_TRACKS mock data. These IDs are
+          // synthetic and must be replaced when real iTunes search data is wired in.
+          const mockId = /^tr-(\d+)$/.exec(String(track.id))?.[1];
+          const itunesTrackId = Number(track.itunesTrackId ?? (mockId ? `900000000000000${mockId}` : NaN));
+          const durationSec = Number(track.durationSec);
+          if (!Number.isSafeInteger(itunesTrackId) || itunesTrackId <= 0 || !Number.isFinite(durationSec) || durationSec <= 0) {
+            throw new Error(`'${track.title}'의 테스트 곡 정보가 올바르지 않습니다.`);
+          }
+          return {
+            itunesTrackId,
+            trackName: track.trackName ?? track.title,
+            artistName: track.artistName ?? track.artist,
+            collectionName: track.collectionName ?? '테스트 앨범',
+            artworkUrl: track.artworkUrl ?? track.art ?? '',
+            previewUrl: track.previewUrl ?? '',
+            trackTimeMillis: Math.round(durationSec * 1000),
+          };
+        });
+        try {
+          await addTracksToPlaylist(pending.id, memberId, dtoTracks);
+        } catch (error) {
+          console.error('Adding playlist tracks failed:', error);
+          setNotice(error?.response?.data?.message || `${error.message || '곡 추가에 실패했어요.'} 플레이리스트는 생성됐습니다. 곡을 수정한 뒤 저장을 눌러 곡 추가만 재시도하세요.`);
+          return;
+        }
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['playlists'] });
+      const result = pending.result;
+      const playlist = {
+        ...result,
+        id: pending.id,
+        title: result?.name ?? title.trim(),
+        tracks,
+        totalSeconds: totalSec,
+        cover: cover || tracks[0]?.art || '',
+        createdAt: new Date().toISOString(),
+        type: 'playlist',
+        isCommute: false,
+      };
+      const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
+      localStorage.setItem('onbeat-playlists', JSON.stringify([playlist, ...saved.filter((item) => String(item.id) !== String(playlist.id))]));
+      setNotice('플레이리스트가 저장되었습니다.');
+      navigate('/library', { state: { createdPlaylist: playlist } });
+    } catch (error) {
+      console.error('Playlist save validation failed:', error);
+      setNotice(error.message || '선택한 곡 정보를 확인해 주세요.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -183,24 +231,10 @@ function PlaylistCreate() {
           </div>
         </div>
       )}
-      <div className="mt-5 flex justify-end"><button onClick={save} disabled={createMutation.isPending} className="flex items-center gap-2 rounded-full bg-spotify-green px-5 py-2.5 text-xs font-extrabold text-black disabled:cursor-not-allowed disabled:opacity-60"><Check size={15} /> {createMutation.isPending ? '저장 중...' : '저장'}</button></div>
+      <div className="mt-5 flex justify-end"><button onClick={save} disabled={isSaving} className="flex items-center gap-2 rounded-full bg-spotify-green px-5 py-2.5 text-xs font-extrabold text-black disabled:cursor-not-allowed disabled:opacity-60"><Check size={15} /> {isSaving ? '저장 중...' : '저장'}</button></div>
     </div>
   );
 }
 
 export default PlaylistCreate;
 
-const MASTER_TRACKS = [
-  { id: 'tr-1', title: '다시 만난 세계 (Into The New World)', artist: '소녀시대', durationSec: 265, art: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
-  { id: 'tr-2', title: '좋은 날', artist: '아이유', durationSec: 233, art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' },
-  { id: 'tr-3', title: 'I', artist: '태연 및 버벌진트', durationSec: 206, art: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300' },
-  { id: 'tr-4', title: 'Fiction', artist: '비스트', durationSec: 234, art: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300' },
-  { id: 'tr-5', title: '내꺼하자', artist: '인피니트', durationSec: 205, art: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300' },
-  { id: 'tr-6', title: 'Only One', artist: '보아', durationSec: 217, art: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300' },
-  { id: 'tr-7', title: 'Ugly', artist: '2NE1', durationSec: 221, art: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300' },
-  { id: 'tr-8', title: '8282', artist: '다비치', durationSec: 218, art: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
-  { id: 'tr-9', title: 'TOUCH MY BODY', artist: '씨스타', durationSec: 208, art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' },
-  { id: 'tr-10', title: '예뻤어 You Were Beautiful', artist: 'DAY6', durationSec: 283, art: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
-  { id: 'tr-11', title: 'Welcome to the Show', artist: 'DAY6', durationSec: 217, art: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300' },
-  { id: 'tr-12', title: 'Magnetic', artist: 'ILLIT', durationSec: 160, art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' },
-];

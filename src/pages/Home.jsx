@@ -3,6 +3,7 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
+import { homeTracks as tracks } from '../mocks/tracks';
 import {
   Disc3,
   MapPin,
@@ -15,6 +16,14 @@ import {
 
 function Home() {
   const [showAllTracks, setShowAllTracks] = useState(false);
+  const [commutePlaylist] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
+      return saved.find((playlist) => playlist.isCommute === true) ?? null;
+    } catch {
+      return null;
+    }
+  });
 
   const visibleTracks = showAllTracks
     ? tracks
@@ -93,8 +102,8 @@ function Home() {
         </button>
       </section>
 
-      {/* 오늘의 출근길 플레이리스트 */}
-      <Card
+      {/* 통근 맞춤 플레이리스트가 생성된 경우에만 표시 */}
+      {commutePlaylist && <Card
         padding="md"
         className="relative overflow-hidden border border-spotify-green/30 bg-linear-to-t from-emerald-950 via-spotify-dark to-spotify-dark"
       >
@@ -115,23 +124,23 @@ function Home() {
           </div>
 
           <h2 className="mb-1 text-lg font-bold text-white">
-            강남역 → 판교역
+            {commutePlaylist.origin} → {commutePlaylist.destination}
           </h2>
 
           <p className="mb-3 text-xs text-spotify-subtext">
-            지하철 · 예상 소요시간 32분
+            {commutePlaylist.mode} · 예상 소요시간 {commutePlaylist.commuteMinutes}분
           </p>
 
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-spotify-green">
-              8곡 · 32분
+              {commutePlaylist.tracks?.length ?? 0}곡 · {Math.round((commutePlaylist.totalSeconds ?? 0) / 60)}분
             </span>
 
             <Button
               type="button"
               variant="primary"
               size="sm"
-              onClick={() => console.log('지도 탭으로 이동')}
+              onClick={() => console.log('통근 플레이리스트 재생:', commutePlaylist.id)}
               className="shrink-0 rounded-full"
             >
               <Play size={14} fill="currentColor" />
@@ -139,7 +148,7 @@ function Home() {
             </Button>
           </div>
         </div>
-      </Card>
+      </Card>}
 
       {/* 주변 인기곡 TOP 50 */}
       <section>
@@ -224,70 +233,3 @@ function Home() {
 export default Home;
 
 
-// 더미 데이터: 실제 API 연동 시 제거 필요
-const tracks = [
-  {
-    id: 1,
-    title: '예뻤어 You Were Beautiful',
-    artist: 'DAY6',
-    image:
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150',
-    listeners: 142,
-  },
-  {
-    id: 2,
-    title: 'Welcome to the Show',
-    artist: 'DAY6',
-    image:
-      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=150',
-    listeners: 128,
-  },
-  {
-    id: 3,
-    title: 'Magnetic',
-    artist: 'ILLIT',
-    image:
-      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=150',
-    listeners: 115,
-  },
-  {
-    id: 4,
-    title: 'Fiction',
-    artist: '비스트',
-    image:
-      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=150',
-    listeners: 98,
-  },
-  {
-    id: 5,
-    title: '좋은 날',
-    artist: '아이유',
-    image:
-      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=150',
-    listeners: 87,
-  },
-  {
-    id: 6,
-    title: 'Spot!',
-    artist: '지코 (ZICO) ft. JENNIE',
-    image:
-      'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=150',
-    listeners: 76,
-  },
-  {
-    id: 7,
-    title: 'Supernova',
-    artist: 'aespa',
-    image:
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=150',
-    listeners: 65,
-  },
-  {
-    id: 8,
-    title: 'How Sweet',
-    artist: 'NewJeans',
-    image:
-      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=150',
-    listeners: 54,
-  },
-];
