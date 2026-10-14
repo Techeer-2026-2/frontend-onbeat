@@ -5,25 +5,8 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
-
-const categories = [
-  {
-    id: 'music',
-    title: '음악',
-    description: '다양한 음악을 찾아보세요',
-    image:
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300',
-    color: 'bg-pink-600',
-  },
-  {
-    id: 'live',
-    title: '라이브 이벤트',
-    description: '공연과 라이브 음악',
-    image:
-      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300',
-    color: 'bg-teal-700',
-  },
-];
+import { searchCategories as categories } from '../mocks/content';
+import { searchTracks as tracks } from '../mocks/tracks';
 
 function Search() {
   const [query, setQuery] = useState('');
@@ -207,62 +190,3 @@ function Search() {
 export default Search;
 
 
-// 검색 화면에서 사용할 목업 데이터
-const tracks = [
-  {
-    id: 'track-1',
-    title: '예뻤어 You Were Beautiful',
-    artist: 'DAY6',
-    image:
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300',
-  },
-  {
-    id: 'track-2',
-    title: 'Welcome to the Show',
-    artist: 'DAY6',
-    image:
-      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300',
-  },
-  {
-    id: 'track-3',
-    title: 'Magnetic',
-    artist: 'ILLIT',
-    image:
-      'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300',
-  },
-  {
-    id: 'track-4',
-    title: 'Fiction',
-    artist: '비스트',
-    image:
-      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300',
-  },
-  {
-    id: 'track-5',
-    title: '좋은 날',
-    artist: '아이유',
-    image:
-      'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=300',
-  },
-  {
-    id: 'track-6',
-    title: 'Spot!',
-    artist: '지코 (ZICO) · JENNIE',
-    image:
-      'https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=300',
-  },
-  {
-    id: 'track-7',
-    title: 'Supernova',
-    artist: 'aespa',
-    image:
-      'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300',
-  },
-  {
-    id: 'track-8',
-    title: 'How Sweet',
-    artist: 'NewJeans',
-    image:
-      'https://images.unsplash.com/photo-1506157786151-b8491531f063?w=300',
-  },
-];

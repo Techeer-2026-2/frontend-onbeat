@@ -1,32 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Check, Globe, ListMusic, MoreHorizontal, Play, Plus,
-  Share2, Shuffle, Music2,
+  Share2, Shuffle, Music2, Trash2,
 } from 'lucide-react';
-import { getPlaylistDetail } from '../api/playlists';
+import { deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail } from '../api/playlists';
+import { playlistTracks as MASTER_TRACKS, recommendedTracks } from '../mocks/tracks';
 
-const MASTER_TRACKS = [
-  { id: 'tr-1', title: '다시 만난 세계 (Into The New World)', artist: '소녀시대', durationSec: 265, art: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
-  { id: 'tr-2', title: '좋은 날', artist: '아이유', durationSec: 233, art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' },
-  { id: 'tr-3', title: 'I', artist: '태연 및 버벌진트', durationSec: 206, art: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300' },
-  { id: 'tr-4', title: 'Fiction', artist: '비스트', durationSec: 234, art: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300' },
-  { id: 'tr-5', title: '내꺼하자', artist: '인피니트', durationSec: 205, art: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300' },
-  { id: 'tr-6', title: 'Only One', artist: '보아', durationSec: 217, art: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=300' },
-  { id: 'tr-7', title: 'Ugly', artist: '2NE1', durationSec: 221, art: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=300' },
-  { id: 'tr-8', title: '8282', artist: '다비치', durationSec: 218, art: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
-  { id: 'tr-9', title: 'TOUCH MY BODY', artist: '씨스타', durationSec: 208, art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' },
-  { id: 'tr-10', title: '예뻤어 You Were Beautiful', artist: 'DAY6', durationSec: 283, art: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300' },
-  { id: 'tr-11', title: 'Welcome to the Show', artist: 'DAY6', durationSec: 217, art: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300' },
-  { id: 'tr-12', title: 'Magnetic', artist: 'ILLIT', durationSec: 160, art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' },
-];
-
-const recommendedTracks = [
-  { id: 'rec-1', title: '스물셋', artist: '아이유', durationSec: 194, art: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=300' },
-  { id: 'rec-2', title: 'Time for the moon night', artist: '여자친구', durationSec: 227, art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300' },
-  { id: 'rec-3', title: '그리워하다', artist: '비투비', durationSec: 216, art: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=300' },
-];
 
 const fmt = (sec) => `${Math.floor(sec / 60)}분`;
 const fmtTrack = (sec) => `${Math.floor(sec / 60)}분 ${sec % 60}초`;
@@ -39,6 +20,7 @@ function normalizeTrack(track, index) {
 
   return {
     id: String(track.id ?? track.trackId ?? `track-${index}`),
+    trackId: track.trackId ?? track.id ?? null,
     title: track.title ?? track.name ?? track.trackName ?? '제목 없는 곡',
     artist: track.artist ?? track.artistName ?? track.artists?.map?.((artist) => artist.name ?? artist).join(', ') ?? '아티스트 정보 없음',
     durationSec,
@@ -49,7 +31,11 @@ function normalizeTrack(track, index) {
 function PlaylistDetail() {
   const { playlistId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const memberId = Number(import.meta.env.VITE_TEST_MEMBER_ID);
+  const [deletingTrackId, setDeletingTrackId] = useState(null);
+  const [isDeletingPlaylist, setIsDeletingPlaylist] = useState(false);
+  const [notice, setNotice] = useState('');
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['playlist', playlistId, memberId],
@@ -70,6 +56,58 @@ function PlaylistDetail() {
   const title = playlist.name ?? playlist.title ?? `내 플레이리스트 #${playlistId}`;
   const cover = playlist.coverImageUrl ?? playlist.imageUrl ?? playlist.cover ?? tracks[0]?.art ?? '';
   const totalSec = tracks.reduce((sum, track) => sum + track.durationSec, 0);
+
+  const handleDeleteTrack = async (track) => {
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) {
+      setNotice('.env.local에 유효한 VITE_TEST_MEMBER_ID를 설정해 주세요.');
+      return;
+    }
+    if (track.trackId == null) {
+      setNotice('서버에서 곡 ID를 확인할 수 없어 삭제할 수 없습니다.');
+      return;
+    }
+    if (deletingTrackId != null) return;
+    setDeletingTrackId(track.trackId);
+    try {
+      await deleteTrackFromPlaylist(playlistId, track.trackId, memberId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['playlist', playlistId, memberId] }),
+        queryClient.invalidateQueries({ queryKey: ['playlists'] }),
+      ]);
+      setNotice(`'${track.title}' 곡을 플레이리스트에서 삭제했습니다.`);
+    } catch (error) {
+      console.error('Playlist track deletion failed:', error);
+      setNotice(error?.response?.data?.message || '곡 삭제에 실패했어요.');
+    } finally {
+      setDeletingTrackId(null);
+    }
+  };
+
+  const handleDeletePlaylist = async () => {
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) {
+      setNotice('.env.local에 유효한 VITE_TEST_MEMBER_ID를 설정해 주세요.');
+      return;
+    }
+    if (!window.confirm(`'${title}' 플레이리스트를 삭제할까요?`)) return;
+    if (isDeletingPlaylist) return;
+    setIsDeletingPlaylist(true);
+    try {
+      await requestDeletePlaylist(playlistId, memberId);
+      try {
+        const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
+        localStorage.setItem('onbeat-playlists', JSON.stringify(saved.filter((item) => String(item.id) !== String(playlistId))));
+      } catch (storageError) {
+        console.error('Could not update local playlist cache after deletion:', storageError);
+      }
+      await queryClient.invalidateQueries({ queryKey: ['playlists'] });
+      navigate('/library', { replace: true });
+    } catch (error) {
+      console.error('Playlist deletion failed:', error);
+      setNotice(error?.response?.data?.message || '플레이리스트 삭제에 실패했어요.');
+    } finally {
+      setIsDeletingPlaylist(false);
+    }
+  };
 
   return (
     <div className="relative min-h-full bg-spotify-black px-4 pb-8 pt-2 text-white">
@@ -98,7 +136,7 @@ function PlaylistDetail() {
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3 text-spotify-subtext">
           <button type="button" aria-label="공유" onClick={() => navigator.clipboard?.writeText(window.location.href)} className="p-1 hover:text-white"><Share2 size={22} /></button>
-          <button type="button" aria-label="더 보기" className="p-1 hover:text-white"><MoreHorizontal size={23} /></button>
+          <button type="button" aria-label="플레이리스트 삭제" title="플레이리스트 삭제" onClick={handleDeletePlaylist} disabled={isDeletingPlaylist} className="p-1 text-spotify-subtext hover:text-red-400 disabled:opacity-50"><Trash2 size={21} /></button>
         </div>
         <div className="flex items-center gap-4">
           <button type="button" aria-label="셔플 재생" className="text-spotify-green"><Shuffle size={25} /></button>
@@ -134,10 +172,12 @@ function PlaylistDetail() {
               {track.art ? <img src={track.art} alt="" className="h-10 w-10 shrink-0 rounded-md object-cover shadow" /> : <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-neutral-800"><Music2 size={18} /></div>}
               <div className="min-w-0"><p className="truncate text-xs font-bold">{track.title}</p><p className="truncate text-[11px] text-spotify-subtext">{track.artist}{track.durationSec ? ` · ${fmtTrack(track.durationSec)}` : ''}</p></div>
             </div>
-            <button type="button" aria-label={`${track.title} 메뉴`} className="ml-2 p-1.5 text-neutral-500 transition hover:text-white"><MoreHorizontal size={18} /></button>
+            <button type="button" aria-label={`${track.title} 플레이리스트에서 삭제`} onClick={() => handleDeleteTrack(track)} disabled={deletingTrackId != null} className="ml-2 p-1.5 text-neutral-500 transition hover:text-red-400 disabled:opacity-50"><Trash2 size={17} /></button>
           </div>
         ))}
       </section>
+
+      {notice && <button type="button" role="status" onClick={() => setNotice('')} className="fixed left-4 right-4 top-12 z-70 mx-auto max-w-sm rounded-xl border border-black/10 bg-spotify-green px-4 py-3 text-left text-xs font-bold text-black shadow-2xl">{notice} <span className="float-right">×</span></button>}
 
       <section className="space-y-3 pt-2">
         <h2 className="text-sm font-extrabold">추천 곡</h2>

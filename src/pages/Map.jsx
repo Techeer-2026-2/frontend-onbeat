@@ -20,22 +20,13 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
+import { mapStations as stations } from '../mocks/content';
 
 const transitModes = [
   { id: 'subway', label: '지하철', icon: TrainFront },
   { id: 'bus', label: '버스', icon: Bus },
   { id: 'walk', label: '도보', icon: Footprints },
   { id: 'car', label: '자동차', icon: CarFront },
-];
-
-// 목업 경로 데이터. API 연동 시에도 같은 형태의 좌표 데이터로 교체할 수 있어요.
-// x/y는 목업 좌표이며, 실제 API 데이터는 longitude/latitude를 사용할 수 있습니다.
-const stations = [
-  { name: '강남역', x: 16, y: 24 },
-  { name: '역삼역', x: 33, y: 38 },
-  { name: '선릉역', x: 50, y: 52 },
-  { name: '삼성역', x: 67, y: 66 },
-  { name: '판교역', x: 84, y: 81 },
 ];
 
 /**
