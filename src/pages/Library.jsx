@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getPlaylists } from '../api/playlists';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -26,46 +28,6 @@ const libraryItems = [
     icon: 'heart',
     count: '8곡',
   },
-  {
-    id: 'commute',
-    title: '출근 플레이리스트 (강남→판교)',
-    subtitle: 'ONBEAT · 32분',
-    type: 'playlist',
-    image:
-      'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300',
-    icon: 'navigation',
-    count: '8곡',
-  },
-  {
-    id: 'daily',
-    title: '오늘의 음악',
-    subtitle: '매일 듣기 좋은 음악',
-    type: 'playlist',
-    image:
-      'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=300',
-    icon: 'playlist',
-    count: '12곡',
-  },
-  {
-    id: 'album-1',
-    title: 'The Book of Us : Entropy',
-    subtitle: 'DAY6',
-    type: 'album',
-    image:
-      'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=300',
-    icon: 'album',
-    count: '앨범',
-  },
-  {
-    id: 'artist-1',
-    title: 'DAY6',
-    subtitle: '아티스트',
-    type: 'artist',
-    image:
-      'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=300',
-    icon: 'artist',
-    count: '아티스트',
-  },
 ];
 
 const filters = [
@@ -77,6 +39,22 @@ const filters = [
 
 function Library() {
   const navigate = useNavigate();
+  const rawMemberId = import.meta.env.VITE_TEST_MEMBER_ID;
+  const memberId = rawMemberId ? Number(rawMemberId) : undefined;
+  const {
+    data: playlistResponse,
+    isError: isPlaylistQueryError,
+  } = useQuery({
+    queryKey: ['playlists', memberId],
+    queryFn: () => getPlaylists(memberId),
+    enabled: Number.isSafeInteger(memberId) && memberId > 0,
+  });
+
+  const serverPlaylists = Array.isArray(playlistResponse)
+    ? playlistResponse
+    : Array.isArray(playlistResponse?.data)
+      ? playlistResponse.data
+      : [];
   const [activeFilter, setActiveFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -98,8 +76,22 @@ function Library() {
     }
   }, []);
 
+  const serverPlaylistItems = useMemo(() => serverPlaylists.map((playlist) => ({
+    id: String(playlist.id),
+    title: playlist.name,
+    subtitle: '내 플레이리스트',
+    type: 'playlist',
+    image: null,
+    icon: 'playlist',
+    count: `${playlist.trackCount ?? 0}곡`,
+  })), [serverPlaylists]);
+
   const visibleItems = useMemo(() => {
-    const allItems = [...savedPlaylistItems, ...libraryItems];
+    const serverIds = new Set(serverPlaylistItems.map((item) => item.id));
+    const localOnlyItems = savedPlaylistItems.filter(
+      (item) => !serverIds.has(String(item.id))
+    );
+    const allItems = [...serverPlaylistItems, ...localOnlyItems, ...libraryItems];
     const normalizedQuery = query.trim().toLowerCase();
 
     return allItems.filter((item) => {
@@ -113,11 +105,15 @@ function Library() {
 
       return matchesFilter && matchesQuery;
     });
-  }, [activeFilter, query, savedPlaylistItems]);
+  }, [activeFilter, query, savedPlaylistItems, serverPlaylistItems]);
 
   const handleItemClick = (item) => {
-    if (item.id?.startsWith('playlist-')) {
-      navigate('/playlist/create');
+    if (item.type === 'playlist' && item.id !== 'liked') {
+      if (String(item.id).startsWith('playlist-')) {
+        navigate('/playlist/create');
+      } else {
+        navigate(`/playlist/${item.id}`);
+      }
       return;
     }
     console.log('라이브러리 항목 선택:', item.title);
@@ -207,6 +203,13 @@ function Library() {
         </div>
       )}
 
+      {/* API 조회 오류 안내 */}
+      {isPlaylistQueryError && (
+        <p role="status" className="text-xs text-amber-300">
+          서버 플레이리스트를 불러오지 못했어요. 저장된 로컬 항목만 표시합니다.
+        </p>
+      )}
+
       {/* 라이브러리 항목 목록 */}
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -225,6 +228,7 @@ function Library() {
           <div className="space-y-3">
             {visibleItems.map((item) => (
                 <button
+                  key={`${item.type}-${item.id}`}
                   type="button"
                   onClick={() => handleItemClick(item)}
                   className="flex w-full items-center gap-3 text-left"
