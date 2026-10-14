@@ -16,7 +16,7 @@ function Header() {
   const title = PAGE_TITLES[pathname];
 
   // 플레이리스트 탭은 별도 헤더를 사용
-  if (pathname === '/playlist/create' || pathname === '/playlist/commute/create') {
+  if (pathname === '/playlist/create' || pathname === '/playlist/commute/create' || /^\/playlist\/\d+$/.test(pathname)) {
     return null;
   }
 

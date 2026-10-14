@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { generateCustomPlaylist } from '../api/playlists';
 import {
   ArrowLeft, Check, ChevronDown, Globe, ListMusic, Plus, Search, Share2,
   Music2, X, Trash2, Play,
@@ -10,7 +12,17 @@ const fmtTrack = (sec) => `${Math.floor(sec / 60)}분 ${sec % 60}초`;
 
 function PlaylistCreate() {
   const navigate = useNavigate();
-  const [title, setTitle] = useState('내 플레이리스트 #2');
+  const queryClient = useQueryClient();
+  const rawMemberId = import.meta.env.VITE_TEST_MEMBER_ID;
+  const memberId = rawMemberId ? Number(rawMemberId) : undefined;
+  const createMutation = useMutation({
+    mutationFn: ({ memberId, name }) =>
+      generateCustomPlaylist(memberId, { name }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['playlists'] });
+    },
+  });
+  const [title, setTitle] = useState('내 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [query, setQuery] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -42,18 +54,43 @@ function PlaylistCreate() {
   };
   const save = () => {
     if (!title.trim()) return setNotice('플레이리스트 이름을 입력해 주세요.');
-    const playlist = { id: `playlist-${Date.now()}`, title: title.trim(), tracks, totalSeconds: totalSec, cover: cover || tracks[0]?.art || '', createdAt: new Date().toISOString(), type: 'playlist' };
-    const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
-    localStorage.setItem('onbeat-playlists', JSON.stringify([playlist, ...saved]));
-    setNotice('플레이리스트가 저장되었습니다.');
-    navigate('/library', { state: { createdPlaylist: playlist } });
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) {
+      setNotice('.env.local에 유효한 VITE_TEST_MEMBER_ID를 설정해 주세요.');
+      return;
+    }
+
+    createMutation.mutate(
+      { memberId, name: title.trim() },
+      {
+        onSuccess: (result) => {
+          const playlist = {
+            ...result,
+            id: result?.id ?? `playlist-${Date.now()}`,
+            title: result?.name ?? title.trim(),
+            tracks,
+            totalSeconds: totalSec,
+            cover: cover || tracks[0]?.art || '',
+            createdAt: new Date().toISOString(),
+            type: 'playlist',
+            isCommute: false,
+          };
+          const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
+          localStorage.setItem('onbeat-playlists', JSON.stringify([playlist, ...saved]));
+          setNotice('플레이리스트가 저장되었습니다.');
+          navigate('/library', { state: { createdPlaylist: playlist } });
+        },
+        onError: (error) => {
+          const message = error?.response?.data?.message;
+          setNotice(message || '플레이리스트 생성에 실패했어요. API 요청값과 서버 로그를 확인해 주세요.');
+        },
+      }
+    );
   };
 
   return (
     <div className="relative min-h-full bg-spotify-black px-4 pb-8 pt-2 text-white">
       <div className="mb-3 flex items-center justify-between">
         <button onClick={() => navigate(-1)} aria-label="뒤로 가기" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"><ArrowLeft size={23} /></button>
-        <button onClick={() => setNotice('공유 링크가 클립보드에 복사되었습니다.')} aria-label="공유" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"><Share2 size={17} /></button>
       </div>
 
       <div className="mb-4 flex items-start gap-4">
@@ -146,7 +183,7 @@ function PlaylistCreate() {
           </div>
         </div>
       )}
-      <div className="mt-5 flex justify-end"><button onClick={save} className="flex items-center gap-2 rounded-full bg-spotify-green px-5 py-2.5 text-xs font-extrabold text-black"><Check size={15} /> 저장</button></div>
+      <div className="mt-5 flex justify-end"><button onClick={save} disabled={createMutation.isPending} className="flex items-center gap-2 rounded-full bg-spotify-green px-5 py-2.5 text-xs font-extrabold text-black disabled:cursor-not-allowed disabled:opacity-60"><Check size={15} /> {createMutation.isPending ? '저장 중...' : '저장'}</button></div>
     </div>
   );
 }
