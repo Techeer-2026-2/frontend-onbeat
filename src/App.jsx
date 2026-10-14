@@ -6,6 +6,7 @@ import Search from './pages/Search';
 import Library from './pages/Library';
 import Map from './pages/Map';
 import PlaylistCreate from './pages/PlaylistCreate';
+import PlaylistDetail from './pages/PlaylistDetail';
 import CommutePlaylistCreate from './pages/CommutePlaylistCreate';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Route path="library" element={<Library />} />
           <Route path="map" element={<Map />} />
           <Route path="playlist/create" element={<PlaylistCreate />} />
+          <Route path="playlist/:playlistId" element={<PlaylistDetail />} />
           <Route path="playlist/commute/create" element={<CommutePlaylistCreate />} />
         </Route>
       </Routes>
