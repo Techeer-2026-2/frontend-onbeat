@@ -120,5 +120,5 @@ https://github.com/Techeer-2026-2/backend
 
 광고 성과 분석 및 캠페인 관리 기능은 별도의 프론트엔드 프로젝트로 관리합니다.
 
-- Repository: `frontend-adlytic`
+- Repository: `frontend-onad`
 ```
