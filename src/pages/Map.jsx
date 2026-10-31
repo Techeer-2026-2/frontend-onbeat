@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { estimateRoute } from '../api/routes';
 import { cancelCommuteSession, completeCommuteSession, startCommuteSession } from '../api/commuteSessions';
 import { getApiErrorMessage, getMemberId } from '../api/client';
@@ -34,6 +34,103 @@ const stationCoordinates = {
   강남역: { startLatitude: 37.4979, startLongitude: 127.0276 },
   판교역: { endLatitude: 37.3947, endLongitude: 127.1112 },
 };
+
+// 카카오맵 SDK를 불러와 출발·도착 지점과 연결선을 그린다. 키는 VITE_KAKAO_JS_KEY 로 받는다.
+function KakaoRouteMap({ start, end }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const key = import.meta.env.VITE_KAKAO_JS_KEY;
+    if (!key || !start || !end) return undefined;
+    let cancelled = false;
+    const draw = () => {
+      if (cancelled || !containerRef.current) return;
+      const kakao = window.kakao;
+      const center = new kakao.maps.LatLng((start.lat + end.lat) / 2, (start.lng + end.lng) / 2);
+      const map = new kakao.maps.Map(containerRef.current, { center, level: 6 });
+      const startLatLng = new kakao.maps.LatLng(start.lat, start.lng);
+      const endLatLng = new kakao.maps.LatLng(end.lat, end.lng);
+      new kakao.maps.Marker({ position: startLatLng, map });
+      new kakao.maps.Marker({ position: endLatLng, map });
+      new kakao.maps.Polyline({
+        path: [startLatLng, endLatLng],
+        strokeWeight: 6,
+        strokeColor: '#1DB954',
+        strokeOpacity: 0.9,
+        map,
+      });
+      const bounds = new kakao.maps.LatLngBounds();
+      bounds.extend(startLatLng);
+      bounds.extend(endLatLng);
+      map.setBounds(bounds);
+    };
+    const load = () => window.kakao.maps.load(draw);
+    if (window.kakao && window.kakao.maps) {
+      load();
+    } else {
+      const existing = document.querySelector('script[data-kakao-sdk]');
+      if (existing) {
+        existing.addEventListener('load', load);
+      } else {
+        const script = document.createElement('script');
+        script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false`;
+        script.async = true;
+        script.dataset.kakaoSdk = '1';
+        script.onload = load;
+        document.head.appendChild(script);
+      }
+    }
+    return () => { cancelled = true; };
+  }, [start, end]);
+
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+}
+
+function TmapRouteMap({ start, end }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const key = import.meta.env.VITE_TMAP_APP_KEY;
+    if (!key || !start || !end) return undefined;
+    let cancelled = false;
+    let attempts = 0;
+    const init = () => {
+      if (cancelled || !containerRef.current) return;
+      // SDK 로더가 실제 지도 객체를 나중에 채우므로 준비될 때까지 기다린다.
+      if (!window.Tmapv2 || typeof window.Tmapv2.LatLng !== 'function') {
+        if (attempts++ < 40) setTimeout(init, 250);
+        return;
+      }
+      const center = new window.Tmapv2.LatLng((start.lat + end.lat) / 2, (start.lng + end.lng) / 2);
+      const map = new window.Tmapv2.Map(containerRef.current, { center, zoom: 13, width: '100%', height: '100%' });
+      const startLatLng = new window.Tmapv2.LatLng(start.lat, start.lng);
+      const endLatLng = new window.Tmapv2.LatLng(end.lat, end.lng);
+      new window.Tmapv2.Marker({ position: startLatLng, map });
+      new window.Tmapv2.Marker({ position: endLatLng, map });
+      new window.Tmapv2.Polyline({
+        path: [startLatLng, endLatLng],
+        strokeColor: '#1DB954',
+        strokeWeight: 6,
+        map,
+      });
+    };
+    if (window.Tmapv2 && typeof window.Tmapv2.LatLng === 'function') {
+      init();
+    } else if (!document.querySelector('script[data-tmap-sdk]')) {
+      const script = document.createElement('script');
+      // TMAP 로더는 document.write 로 본체를 넣어서 동적 삽입에서는 동작하지 않는다. 본체 파일을 직접 받는다.
+      script.src = 'https://topopentile1.tmap.co.kr/scriptSDKV2/tmapjs2.min.js?version=20231206';
+      script.async = true;
+      script.dataset.tmapSdk = '1';
+      script.onload = init;
+      document.head.appendChild(script);
+      init();
+    }
+    return () => { cancelled = true; };
+  }, [start, end]);
+
+  return <div ref={containerRef} className="h-full w-full" />;
+}
 
 function Map() {
   const [isRouteConfigured, setIsRouteConfigured] = useState(false);
@@ -261,7 +358,7 @@ function Map() {
             <div className="relative z-10 flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2 rounded-xl bg-black/90 px-3 py-2 text-xs text-white">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-spotify-green" />
-                <span>GPS 위치 추적 모의 화면</span>
+                <span>경로 미리보기</span>
               </div>
 
               <IconButton
@@ -277,8 +374,11 @@ function Map() {
             </div>
 
             {/* 2. 노선 표시 영역: 높이를 줄이고 내부 여백을 확보 */}
-            <div className="relative flex h-44 w-full items-center justify-center px-6 text-center text-xs text-spotify-subtext">
-              경로 선형 지도 데이터는 현재 API 명세에 제공되지 않습니다.
+            <div className="relative flex h-44 w-full items-center justify-center px-6">
+              <KakaoRouteMap
+                start={stationCoordinates[origin] ? { lat: stationCoordinates[origin].startLatitude ?? stationCoordinates[origin].endLatitude, lng: stationCoordinates[origin].startLongitude ?? stationCoordinates[origin].endLongitude } : null}
+                end={stationCoordinates[destination] ? { lat: stationCoordinates[destination].endLatitude ?? stationCoordinates[destination].startLatitude, lng: stationCoordinates[destination].endLongitude ?? stationCoordinates[destination].startLongitude } : null}
+              />
             </div>
 
             {/* 3. 예상 소요 시간 카드 */}
