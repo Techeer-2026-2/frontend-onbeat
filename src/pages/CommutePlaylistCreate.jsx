@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { generateRecommendedPlaylist } from '../api/playlists';
 import { playlistTracks as TRACKS } from '../mocks/tracks';
-import { ArrowLeft, CheckCircle2, ChevronRight, Clock3, MapPin, Navigation, Plus, Route, Search, Share2, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock3, MapPin, Plus, Route, Search, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
 
 const modes = [{ label: '지하철', Icon: Train }, { label: '버스', Icon: Bus }, { label: '도보', Icon: Footprints }, { label: '자차', Icon: Car }];
 const mins = (sec) => Math.round(sec / 60);
@@ -23,8 +23,8 @@ export default function CommutePlaylistCreate() {
   const [origin, setOrigin] = useState('강남역');
   const [destination, setDestination] = useState('판교역');
   const [mode, setMode] = useState('지하철');
-  const [duration, setDuration] = useState(32);
-  const [title, setTitle] = useState('출근 맞춤 플레이리스트');
+  const [duration] = useState(32);
+  const [title] = useState('출근 맞춤 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
