@@ -47,9 +47,12 @@ function PlaylistDetail() {
   });
 
   const playlist = data?.data ?? data?.playlist ?? data ?? {};
-  const rawTracks = playlist.tracks ?? playlist.trackList ?? playlist.items ?? [];
   const tracks = useMemo(
-    () => (Array.isArray(rawTracks) ? rawTracks.map(normalizeTrack) : []),
+    () => {
+      const playlistData = data?.data ?? data?.playlist ?? data ?? {};
+      const rawTracks = playlistData.tracks ?? playlistData.trackList ?? playlistData.items ?? [];
+      return Array.isArray(rawTracks) ? rawTracks.map(normalizeTrack) : [];
+    },
     [data],
   );
   const available = useMemo(
