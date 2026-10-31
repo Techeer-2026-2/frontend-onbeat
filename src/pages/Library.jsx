@@ -45,7 +45,7 @@ function Library() {
   const savedPlaylistItems = useMemo(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
-      return saved.filter((playlist) => !isCommutePlaylist(playlist) && !isPlaceholderPlaylist(playlist)).map((playlist) => ({
+      return saved.filter((playlist) => !isPlaceholderPlaylist(playlist)).map((playlist) => ({
         id: playlist.id,
         title: playlist.title,
         subtitle: playlist.description || `내 플레이리스트 · ${playlist.tracks?.length || 0}곡`,
@@ -65,7 +65,7 @@ function Library() {
       : Array.isArray(playlistResponse?.data)
         ? playlistResponse.data
         : [];
-    return serverPlaylists.filter((playlist) => !isCommutePlaylist(playlist) && !isPlaceholderPlaylist(playlist)).map((playlist) => ({
+    return serverPlaylists.filter((playlist) => !isPlaceholderPlaylist(playlist)).map((playlist) => ({
       id: String(playlist.id),
       title: playlist.name ?? playlist.title ?? '플레이리스트',
       subtitle: '내 플레이리스트',
