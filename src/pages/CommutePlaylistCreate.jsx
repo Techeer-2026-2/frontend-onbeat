@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { generateRecommendedPlaylist } from '../api/playlists';
+import { getApiErrorMessage, getMemberId } from '../api/client';
 import { playlistTracks as TRACKS } from '../mocks/tracks';
-import { ArrowLeft, CheckCircle2, ChevronRight, Clock3, MapPin, Navigation, Plus, Route, Search, Share2, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock3, MapPin, Plus, Route, Search, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
 
 const modes = [{ label: '지하철', Icon: Train }, { label: '버스', Icon: Bus }, { label: '도보', Icon: Footprints }, { label: '자차', Icon: Car }];
 const mins = (sec) => Math.round(sec / 60);
@@ -11,8 +12,7 @@ const mins = (sec) => Math.round(sec / 60);
 export default function CommutePlaylistCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const rawMemberId = import.meta.env.VITE_TEST_MEMBER_ID;
-  const memberId = rawMemberId ? Number(rawMemberId) : undefined;
+  const memberId = getMemberId();
   const createMutation = useMutation({
     mutationFn: ({ memberId, name }) =>
       generateRecommendedPlaylist(memberId, { name }),
@@ -23,8 +23,8 @@ export default function CommutePlaylistCreate() {
   const [origin, setOrigin] = useState('강남역');
   const [destination, setDestination] = useState('판교역');
   const [mode, setMode] = useState('지하철');
-  const [duration, setDuration] = useState(32);
-  const [title, setTitle] = useState('출근 맞춤 플레이리스트');
+  const [duration] = useState(32);
+  const [title] = useState('출근 맞춤 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -89,8 +89,7 @@ export default function CommutePlaylistCreate() {
           navigate('/library', { state: { createdPlaylist: playlist } });
         },
         onError: (error) => {
-          const message = error?.response?.data?.message;
-          setMessage(message || '통근 플레이리스트 생성에 실패했어요. API 요청값과 서버 로그를 확인해 주세요.');
+          setMessage(getApiErrorMessage(error, '통근 플레이리스트 생성에 실패했어요. API 요청값과 서버 로그를 확인해 주세요.'));
         },
       }
     );
