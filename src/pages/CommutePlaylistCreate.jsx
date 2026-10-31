@@ -1,13 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { generateRecommendedPlaylist } from '../api/playlists';
+import { estimateRoute } from '../api/routes';
 import { getApiErrorMessage, getMemberId } from '../api/client';
 import { playlistTracks as TRACKS } from '../mocks/tracks';
 import { ArrowLeft, CheckCircle2, Clock3, MapPin, Plus, Route, Search, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
 
 const modes = [{ label: '지하철', Icon: Train }, { label: '버스', Icon: Bus }, { label: '도보', Icon: Footprints }, { label: '자차', Icon: Car }];
 const mins = (sec) => Math.round(sec / 60);
+const transportModeMap = { 지하철: 'SUBWAY', 버스: 'BUS', 도보: 'WALK', 자차: 'CAR' };
+const locationCoordinates = {
+  강남역: { latitude: 37.4979, longitude: 127.0276 },
+  판교역: { latitude: 37.3947, longitude: 127.1112 },
+};
 
 export default function CommutePlaylistCreate() {
   const navigate = useNavigate();
@@ -23,14 +29,51 @@ export default function CommutePlaylistCreate() {
   const [origin, setOrigin] = useState('강남역');
   const [destination, setDestination] = useState('판교역');
   const [mode, setMode] = useState('지하철');
-  const [duration] = useState(32);
+  const [duration, setDuration] = useState(32);
   const [title] = useState('출근 맞춤 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [message, setMessage] = useState('');
+  const [isEstimatingRoute, setIsEstimatingRoute] = useState(false);
   const total = tracks.reduce((sum, track) => sum + track.durationSec, 0);
   const filteredTracks = useMemo(() => TRACKS.filter(t => `${t.title} ${t.artist}`.toLowerCase().includes(search.toLowerCase())), [search]);
+
+  useEffect(() => {
+    const start = locationCoordinates[origin.trim()];
+    const end = locationCoordinates[destination.trim()];
+    if (!start || !end) return undefined;
+
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setIsEstimatingRoute(true);
+      try {
+        const result = await estimateRoute({
+          startLatitude: start.latitude,
+          startLongitude: start.longitude,
+          endLatitude: end.latitude,
+          endLongitude: end.longitude,
+          transportMode: transportModeMap[mode],
+        });
+        const nextDuration = Number(result?.durationMinutes);
+        if (!cancelled && Number.isFinite(nextDuration) && nextDuration > 0) {
+          setDuration(Math.round(nextDuration));
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Route duration estimate failed:', error);
+          setMessage(getApiErrorMessage(error, '경로 소요시간을 계산하지 못했어요.'));
+        }
+      } finally {
+        if (!cancelled) setIsEstimatingRoute(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [origin, destination, mode]);
   const addTrack = (track) => {
     if (tracks.some(t => t.id === track.id)) { setMessage('이미 플레이리스트에 담긴 곡입니다.'); return; }
     setTracks(current => [...current, track]); setMessage(`'${track.title}' 곡이 추가되었습니다.`);
@@ -109,7 +152,7 @@ export default function CommutePlaylistCreate() {
       <label className="block text-xs text-spotify-subtext">도착지 입력</label>
       <div className="relative"><MapPin size={16} className="absolute left-3 top-3.5 text-sky-400"/><input value={destination} onChange={e=>setDestination(e.target.value)} placeholder="예: 판교역" className="w-full rounded-xl border border-white/10 bg-spotify-card py-3 pl-9 pr-3 text-sm text-white outline-none focus:border-spotify-green"/></div>
       <div><p className="mb-2 text-xs text-spotify-subtext">이동 수단 선택</p><div className="grid grid-cols-4 gap-2">{modes.map(({label, Icon})=><button key={label} onClick={()=>setMode(label)} className={`flex flex-col items-center gap-1 rounded-xl border py-2.5 text-xs font-bold transition ${mode===label?'border-spotify-green bg-spotify-green/20 text-spotify-green':'border-white/10 bg-spotify-card text-spotify-subtext hover:text-white'}`}><Icon size={17}/>{label}</button>)}</div></div>
-      <div className="rounded-xl border border-white/10 bg-black/30 p-3"><div className="mb-2 flex items-center justify-between text-xs font-bold"><span>예상 이동 시간</span><span className="text-spotify-green">{duration}분 소요</span></div><div className="mt-1 flex justify-between text-[10px] text-spotify-subtext"></div><p className="text-[11px] text-spotify-subtext">추천 플레이리스트: 약 {duration}분에 맞춰 자동 구성</p></div>
+      <div className="rounded-xl border border-white/10 bg-black/30 p-3"><div className="mb-2 flex items-center justify-between text-xs font-bold"><span>예상 이동 시간</span><span className="text-spotify-green">{isEstimatingRoute ? '계산 중...' : `${duration}분 소요`}</span></div><div className="mt-1 flex justify-between text-[10px] text-spotify-subtext"></div><p className="text-[11px] text-spotify-subtext">추천 플레이리스트: 약 {duration}분에 맞춰 자동 구성</p></div>
     </section>
 
     <section className="mb-4 rounded-2xl border border-white/10 bg-spotify-dark p-3.5">
