@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { addTracksToPlaylist, generateCustomPlaylist } from '../api/playlists';
+import { getApiErrorMessage, getMemberId } from '../api/client';
 import { playlistTracks as MASTER_TRACKS } from '../mocks/tracks';
 import {
   ArrowLeft, Check, Globe, ListMusic, Plus, Search,
@@ -14,8 +15,7 @@ const fmtTrack = (sec) => `${Math.floor(sec / 60)}분 ${sec % 60}초`;
 function PlaylistCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const rawMemberId = import.meta.env.VITE_TEST_MEMBER_ID;
-  const memberId = rawMemberId ? Number(rawMemberId) : undefined;
+  const memberId = getMemberId();
   const [title, setTitle] = useState('내 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [query, setQuery] = useState('');
@@ -63,10 +63,10 @@ function PlaylistCreate() {
       if (!pending) {
         let result;
         try {
-          result = await generateCustomPlaylist({ name: title.trim() });
+          result = await generateCustomPlaylist(memberId, { name: title.trim() });
         } catch (error) {
           console.error('Playlist creation failed:', error);
-          setNotice(error?.response?.data?.message || '플레이리스트 생성에 실패했어요.');
+          setNotice(getApiErrorMessage(error, '플레이리스트 생성에 실패했어요.'));
           return;
         }
         const payload = result?.data ?? result?.playlist ?? result;
@@ -99,13 +99,14 @@ function PlaylistCreate() {
             artworkUrl: track.artworkUrl ?? track.art ?? '',
             previewUrl: track.previewUrl ?? '',
             trackTimeMillis: Math.round(durationSec * 1000),
+            genre: track.genre ?? 'Unknown',
           };
         });
         try {
           await addTracksToPlaylist(pending.id, memberId, dtoTracks);
         } catch (error) {
           console.error('Adding playlist tracks failed:', error);
-          setNotice(error?.response?.data?.message || `${error.message || '곡 추가에 실패했어요.'} 플레이리스트는 생성됐습니다. 곡을 수정한 뒤 저장을 눌러 곡 추가만 재시도하세요.`);
+          setNotice(`${getApiErrorMessage(error, '곡 추가에 실패했어요.')} 플레이리스트는 생성됐습니다. 곡을 수정한 뒤 저장을 눌러 곡 추가만 재시도하세요.`);
           return;
         }
       }
