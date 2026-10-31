@@ -8,6 +8,7 @@ import {
 
 import { deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail, updatePlaylist } from '../api/playlists';
 import { getApiErrorMessage } from '../api/client';
+import { createPlaylistShare } from '../api/playlistShares';
 import { playlistTracks as MASTER_TRACKS, recommendedTracks } from '../mocks/tracks';
 
 
@@ -39,6 +40,7 @@ function PlaylistDetail() {
   const [isDeletingPlaylist, setIsDeletingPlaylist] = useState(false);
   const [isUpdatingPlaylist, setIsUpdatingPlaylist] = useState(false);
   const [notice, setNotice] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['playlist', playlistId, memberId],
@@ -59,6 +61,27 @@ function PlaylistDetail() {
   const title = playlist.name ?? playlist.title ?? `내 플레이리스트 #${playlistId}`;
   const cover = playlist.coverImageUrl ?? playlist.imageUrl ?? playlist.cover ?? tracks[0]?.art ?? '';
   const totalSec = tracks.reduce((sum, track) => sum + track.durationSec, 0);
+
+  const handleShare = async () => {
+    if (isSharing) return;
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) {
+      setNotice('.env.local에 유효한 VITE_TEST_MEMBER_ID를 설정해 주세요.');
+      return;
+    }
+    setIsSharing(true);
+    try {
+      const result = await createPlaylistShare(playlistId, memberId);
+      const shareToken = result?.shareToken ?? result?.data?.shareToken ?? result?.token;
+      const shareUrl = result?.shareUrl ?? result?.url ?? result?.data?.shareUrl
+        ?? (shareToken ? `${window.location.origin}/shared/playlists/${shareToken}` : window.location.href);
+      await navigator.clipboard?.writeText(shareUrl);
+      setNotice('플레이리스트 공유 링크를 복사했습니다.');
+    } catch (error) {
+      setNotice(getApiErrorMessage(error, '플레이리스트 공유 링크를 만들지 못했어요.'));
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   const handleDeleteTrack = async (track) => {
     if (!Number.isSafeInteger(memberId) || memberId <= 0) {
@@ -172,7 +195,7 @@ function PlaylistDetail() {
 
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-3 text-spotify-subtext">
-          <button type="button" aria-label="공유" onClick={() => navigator.clipboard?.writeText(window.location.href)} className="p-1 hover:text-white"><Share2 size={22} /></button>
+          <button type="button" aria-label="공유" onClick={handleShare} disabled={isSharing} className="p-1 hover:text-white disabled:opacity-50"><Share2 size={22} /></button>
           <button type="button" aria-label="플레이리스트 삭제" title="플레이리스트 삭제" onClick={handleDeletePlaylist} disabled={isDeletingPlaylist} className="p-1 text-spotify-subtext hover:text-red-400 disabled:opacity-50"><Trash2 size={21} /></button>
         </div>
         <div className="flex items-center gap-4">
