@@ -42,6 +42,9 @@ function PlaylistDetail() {
   const [isOrderingTracks, setIsOrderingTracks] = useState(false);
   const [notice, setNotice] = useState('');
   const [isSharing, setIsSharing] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [editName, setEditName] = useState('');
   const [showTrackPicker, setShowTrackPicker] = useState(false);
   const [trackQuery, setTrackQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -157,8 +160,7 @@ function PlaylistDetail() {
     }
     if (isUpdatingPlaylist) return;
 
-    const name = window.prompt('플레이리스트 이름을 입력하세요:', title);
-    if (name === null) return;
+    const name = editName;
     if (!name.trim()) {
       setNotice('플레이리스트 이름을 입력해 주세요.');
       return;
@@ -176,6 +178,7 @@ function PlaylistDetail() {
         queryClient.invalidateQueries({ queryKey: ['playlists'] }),
       ]);
       setNotice('플레이리스트 정보를 수정했습니다.');
+      setShowEditModal(false);
     } catch (error) {
       console.error('Playlist update failed:', error);
       setNotice(getApiErrorMessage(error, '플레이리스트 수정에 실패했어요.'));
@@ -256,9 +259,9 @@ function PlaylistDetail() {
 
       <div className="mb-5 grid grid-cols-4 gap-2">
         <button type="button" onClick={() => setShowTrackPicker(true)} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10"><Plus size={16} />추가</button>
-        <button type="button" onClick={handleUpdatePlaylist} disabled={isUpdatingPlaylist} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10 disabled:opacity-50"><ListMusic size={16} />{isUpdatingPlaylist ? '저장 중' : '수정'}</button>
+        <button type="button" onClick={() => { setEditName(title); setShowEditModal(true); }} disabled={isUpdatingPlaylist} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10 disabled:opacity-50"><ListMusic size={16} />수정</button>
         <button type="button" onClick={handleToggleTrackOrder} disabled={isOrderingTracks || tracks.length < 2} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10 disabled:opacity-50"><Check size={16} />{isOrderingTracks ? '저장 중' : '정렬'}</button>
-        <button type="button" onClick={() => window.alert(`플레이리스트 이름: ${title}`)} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[10px] font-bold hover:bg-white/10"><MoreHorizontal size={16} />정보</button>
+        <button type="button" onClick={() => setShowInfoModal(true)} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[10px] font-bold hover:bg-white/10"><MoreHorizontal size={16} />정보</button>
       </div>
 
       {isLoading && <p className="py-5 text-center text-xs text-spotify-subtext">플레이리스트를 불러오는 중이에요...</p>}
@@ -288,6 +291,9 @@ function PlaylistDetail() {
       </section>
 
       {notice && <button type="button" role="status" onClick={() => setNotice('')} className="fixed left-4 right-4 top-12 z-70 mx-auto max-w-sm rounded-xl border border-black/10 bg-spotify-green px-4 py-3 text-left text-xs font-bold text-black shadow-2xl">{notice} <span className="float-right">×</span></button>}
+
+      {showEditModal && <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4"><div className="w-full max-w-sm rounded-2xl bg-spotify-card p-5"><h2 className="mb-4 text-base font-bold">플레이리스트 수정</h2><label htmlFor="playlist-name" className="mb-2 block text-xs text-spotify-subtext">플레이리스트 이름</label><input id="playlist-name" value={editName} onChange={(event) => setEditName(event.target.value)} className="w-full rounded-xl bg-spotify-dark px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-spotify-green" /><div className="mt-4 flex gap-2"><button type="button" onClick={() => setShowEditModal(false)} className="flex-1 rounded-full bg-white/10 py-2.5 text-sm">취소</button><button type="button" onClick={handleUpdatePlaylist} disabled={isUpdatingPlaylist} className="flex-1 rounded-full bg-spotify-green py-2.5 text-sm font-bold text-black">{isUpdatingPlaylist ? '저장 중' : '저장'}</button></div></div></div>}
+      {showInfoModal && <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/70 px-4"><div className="w-full max-w-sm rounded-2xl bg-spotify-card p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-base font-bold">플레이리스트 정보</h2><button type="button" onClick={() => setShowInfoModal(false)} aria-label="정보 닫기">닫기</button></div><div className="space-y-3 text-sm"><p><span className="text-spotify-subtext">이름</span><br />{title}</p><p><span className="text-spotify-subtext">수록 곡</span><br />{tracks.length}곡</p><p><span className="text-spotify-subtext">재생 시간</span><br />{fmt(totalSec)}</p></div></div></div>}
 
       <section className="space-y-3 pt-2">
         <h2 className="text-sm font-extrabold">추천 곡</h2>
