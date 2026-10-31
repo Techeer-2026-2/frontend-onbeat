@@ -75,13 +75,17 @@ function Search() {
       setPlaybackError('이 곡은 미리듣기를 제공하지 않아요.');
       return;
     }
+    if (playingTrackId === track.id && audioRef.current) {
+      audioRef.current.pause();
+      setPlayingTrackId(null);
+      return;
+    }
     audioRef.current?.pause();
     const audio = new Audio(track.previewUrl);
     audioRef.current = audio;
     setPlayingTrackId(track.id);
     setPlaybackError('');
     try {
-      await recordPlaybackEvent(memberId, { trackId: track.itunesTrackId ?? track.id, eventType: 'PLAY' });
       audio.onended = async () => {
         setPlayingTrackId(null);
         try {
@@ -94,6 +98,8 @@ function Search() {
       };
       audio.onerror = () => setPlayingTrackId(null);
       await audio.play();
+      recordPlaybackEvent(memberId, { trackId: track.itunesTrackId ?? track.id, eventType: 'PLAY' })
+        .catch((error) => console.error('Playback event failed:', error));
     } catch (error) {
       setPlayingTrackId(null);
       setPlaybackError(getApiErrorMessage(error, '음악 재생을 시작하지 못했어요.'));
