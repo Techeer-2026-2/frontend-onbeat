@@ -11,7 +11,6 @@ import {
   Music2,
   Play,
   Square,
-  SlidersHorizontal,
   X,
   ArrowRight,
 } from 'lucide-react';
@@ -117,32 +116,6 @@ function Map() {
 
   return (
     <div className="space-y-5 px-4 pb-6 pt-4">
-      {/* 페이지 헤더 */}
-      <section className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-spotify-green text-black">
-            <MapPin size={26} fill="currentColor" />
-          </div>
-
-          <h1 className="text-2xl font-bold text-white">
-            통근 지도
-          </h1>
-        </div>
-
-        {isRouteConfigured && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setIsEditingRoute(true)}
-          >
-            <span className="flex items-center gap-2">
-              <SlidersHorizontal size={16} />
-              경로 관리
-            </span>
-          </Button>
-        )}
-      </section>
-
       {/* 통근 경로 미설정 화면 */}
       {!isRouteConfigured ? (
         <Card padding="lg" className="mt-8">

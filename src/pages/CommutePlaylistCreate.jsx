@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { generateRecommendedPlaylist } from '../api/playlists';
-import { estimateRoute } from '../api/routes';
-import { getApiErrorMessage, getMemberId } from '../api/client';
+import { createCommuteProfile, getCommuteProfiles } from '../api/commuteProfiles';
 import { playlistTracks as TRACKS } from '../mocks/tracks';
 import { ArrowLeft, CheckCircle2, Clock3, MapPin, Plus, Route, Search, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
 
@@ -14,26 +13,33 @@ const locationCoordinates = {
   강남역: { latitude: 37.4979, longitude: 127.0276 },
   판교역: { latitude: 37.3947, longitude: 127.1112 },
 };
-const defaultOriginCoordinates = { latitude: 37.4979, longitude: 127.0276 };
-
-function getStoredCommuteProfileId() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('onbeat-commute-profile') || 'null');
-    return saved?.commuteProfileId ?? saved?.profileId ?? null;
-  } catch {
-    return null;
-  }
-}
 
 export default function CommutePlaylistCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const memberId = getMemberId();
-  const configuredProfileId = import.meta.env.VITE_TEST_COMMUTE_PROFILE_ID || getStoredCommuteProfileId();
-  const commuteProfileId = configuredProfileId == null ? null : Number(configuredProfileId);
+  const rawMemberId = import.meta.env.VITE_TEST_MEMBER_ID;
+  const memberId = rawMemberId ? Number(rawMemberId) : undefined;
   const createMutation = useMutation({
-    mutationFn: ({ memberId, payload }) =>
-      generateRecommendedPlaylist(memberId, payload),
+    mutationFn: async ({ memberId, name, profilePayload, playlistPayload }) => {
+      const profilesResponse = await getCommuteProfiles(memberId);
+      const profiles = Array.isArray(profilesResponse)
+        ? profilesResponse
+        : Array.isArray(profilesResponse?.data) ? profilesResponse.data : [];
+      const existingProfile = profiles.find((profile) =>
+        profile.frequentRouteName === profilePayload.frequentRouteName
+        && profile.transportMode === profilePayload.transportMode
+      );
+      const profile = existingProfile ?? await createCommuteProfile(memberId, profilePayload);
+      const commuteProfileId = profile?.id ?? profile?.profileId;
+      if (!Number.isSafeInteger(Number(commuteProfileId)) || Number(commuteProfileId) <= 0) {
+        throw new Error('통근 프로필 생성 응답에서 ID를 확인하지 못했습니다.');
+      }
+      const result = await generateRecommendedPlaylist(memberId, {
+        ...playlistPayload,
+        commuteProfileId: Number(commuteProfileId),
+      });
+      return { result, commuteProfileId: Number(commuteProfileId), name };
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['playlists'] });
     },
@@ -41,51 +47,14 @@ export default function CommutePlaylistCreate() {
   const [origin, setOrigin] = useState('강남역');
   const [destination, setDestination] = useState('판교역');
   const [mode, setMode] = useState('지하철');
-  const [duration, setDuration] = useState(32);
+  const [duration] = useState(32);
   const [title] = useState('출근 맞춤 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [message, setMessage] = useState('');
-  const [isEstimatingRoute, setIsEstimatingRoute] = useState(false);
   const total = tracks.reduce((sum, track) => sum + track.durationSec, 0);
   const filteredTracks = useMemo(() => TRACKS.filter(t => `${t.title} ${t.artist}`.toLowerCase().includes(search.toLowerCase())), [search]);
-
-  useEffect(() => {
-    const start = locationCoordinates[origin.trim()];
-    const end = locationCoordinates[destination.trim()];
-    if (!start || !end) return undefined;
-
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      setIsEstimatingRoute(true);
-      try {
-        const result = await estimateRoute({
-          startLatitude: start.latitude,
-          startLongitude: start.longitude,
-          endLatitude: end.latitude,
-          endLongitude: end.longitude,
-          transportMode: transportModeMap[mode],
-        });
-        const nextDuration = Number(result?.durationMinutes);
-        if (!cancelled && Number.isFinite(nextDuration) && nextDuration > 0) {
-          setDuration(Math.round(nextDuration));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('Route duration estimate failed:', error);
-          setMessage(getApiErrorMessage(error, '경로 소요시간을 계산하지 못했어요.'));
-        }
-      } finally {
-        if (!cancelled) setIsEstimatingRoute(false);
-      }
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [origin, destination, mode]);
   const addTrack = (track) => {
     if (tracks.some(t => t.id === track.id)) { setMessage('이미 플레이리스트에 담긴 곡입니다.'); return; }
     setTracks(current => [...current, track]); setMessage(`'${track.title}' 곡이 추가되었습니다.`);
@@ -112,25 +81,34 @@ export default function CommutePlaylistCreate() {
       return;
     }
 
-    if (!Number.isSafeInteger(commuteProfileId) || commuteProfileId <= 0) {
-      setMessage('통근 프로필을 먼저 등록하거나 .env.local에 유효한 VITE_TEST_COMMUTE_PROFILE_ID를 설정해 주세요.');
+    const start = locationCoordinates[origin.trim()];
+    const end = locationCoordinates[destination.trim()];
+    if (!start || !end) {
+      setMessage('현재는 지원되는 장소 좌표가 없어 통근 프로필을 만들 수 없습니다.');
       return;
     }
-
     const playlistName = `${title} (${origin.trim()}→${destination.trim()})`;
+    const profilePayload = {
+      commuteType: 'TO_WORK',
+      transportMode: transportModeMap[mode],
+      frequentRouteName: `${origin.trim()} → ${destination.trim()}`,
+      departure: { ...start, placeName: origin.trim() },
+      arrival: { ...end, placeName: destination.trim() },
+    };
     createMutation.mutate(
       {
         memberId,
-        payload: {
-          commuteProfileId,
+        name: playlistName,
+        profilePayload,
+        playlistPayload: {
           name: playlistName,
           size: tracks.length,
-          latitude: defaultOriginCoordinates.latitude,
-          longitude: defaultOriginCoordinates.longitude,
+          latitude: start.latitude,
+          longitude: start.longitude,
         },
       },
       {
-        onSuccess: (result) => {
+        onSuccess: ({ result, commuteProfileId }) => {
           const generated = result?.data ?? result?.playlist ?? result;
           const playlist = {
             ...generated,
@@ -142,6 +120,7 @@ export default function CommutePlaylistCreate() {
             origin: origin.trim(),
             destination: destination.trim(),
             mode,
+            commuteProfileId,
             commuteMinutes: duration,
             tracks,
             totalSeconds: total,
@@ -158,7 +137,8 @@ export default function CommutePlaylistCreate() {
           navigate('/library', { state: { createdPlaylist: playlist } });
         },
         onError: (error) => {
-          setMessage(getApiErrorMessage(error, '통근 플레이리스트 생성에 실패했어요. API 요청값과 서버 로그를 확인해 주세요.'));
+          const message = error?.response?.data?.message;
+          setMessage(message || '통근 플레이리스트 생성에 실패했어요. API 요청값과 서버 로그를 확인해 주세요.');
         },
       }
     );
@@ -178,7 +158,7 @@ export default function CommutePlaylistCreate() {
       <label className="block text-xs text-spotify-subtext">도착지 입력</label>
       <div className="relative"><MapPin size={16} className="absolute left-3 top-3.5 text-sky-400"/><input value={destination} onChange={e=>setDestination(e.target.value)} placeholder="예: 판교역" className="w-full rounded-xl border border-white/10 bg-spotify-card py-3 pl-9 pr-3 text-sm text-white outline-none focus:border-spotify-green"/></div>
       <div><p className="mb-2 text-xs text-spotify-subtext">이동 수단 선택</p><div className="grid grid-cols-4 gap-2">{modes.map(({label, Icon})=><button key={label} onClick={()=>setMode(label)} className={`flex flex-col items-center gap-1 rounded-xl border py-2.5 text-xs font-bold transition ${mode===label?'border-spotify-green bg-spotify-green/20 text-spotify-green':'border-white/10 bg-spotify-card text-spotify-subtext hover:text-white'}`}><Icon size={17}/>{label}</button>)}</div></div>
-      <div className="rounded-xl border border-white/10 bg-black/30 p-3"><div className="mb-2 flex items-center justify-between text-xs font-bold"><span>예상 이동 시간</span><span className="text-spotify-green">{isEstimatingRoute ? '계산 중...' : `${duration}분 소요`}</span></div><div className="mt-1 flex justify-between text-[10px] text-spotify-subtext"></div><p className="text-[11px] text-spotify-subtext">추천 플레이리스트: 약 {duration}분에 맞춰 자동 구성</p></div>
+      <div className="rounded-xl border border-white/10 bg-black/30 p-3"><div className="mb-2 flex items-center justify-between text-xs font-bold"><span>예상 이동 시간</span><span className="text-spotify-green">{duration}분 소요</span></div><div className="mt-1 flex justify-between text-[10px] text-spotify-subtext"></div><p className="text-[11px] text-spotify-subtext">추천 플레이리스트: 약 {duration}분에 맞춰 자동 구성</p></div>
     </section>
 
     <section className="mb-4 rounded-2xl border border-white/10 bg-spotify-dark p-3.5">

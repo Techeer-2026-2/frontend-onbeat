@@ -66,7 +66,6 @@ function Library() {
       : Array.isArray(playlistResponse?.data)
         ? playlistResponse.data
         : [];
-
     return serverPlaylists.filter((playlist) => !isCommutePlaylist(playlist)).map((playlist) => ({
       id: String(playlist.id),
       title: playlist.name,
