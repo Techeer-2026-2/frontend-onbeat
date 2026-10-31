@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
-import { homeTracks as tracks } from '../mocks/tracks';
+import { getMusicRankings, normalizeRankingTrack } from '../api/rankings';
 import {
   Disc3,
   MapPin,
@@ -16,6 +17,32 @@ import {
 
 function Home() {
   const [showAllTracks, setShowAllTracks] = useState(false);
+  const [rankingScope, setRankingScope] = useState('NEARBY');
+  const [location, setLocation] = useState(null);
+  const [locationError, setLocationError] = useState('');
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      Promise.resolve().then(() => setLocationError('현재 위치를 사용할 수 없어 주변 랭킹을 불러올 수 없어요.'));
+      return undefined;
+    }
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => setLocation({ lat: coords.latitude, lng: coords.longitude }),
+      () => setLocationError('위치 권한을 허용하면 주변 인기곡을 볼 수 있어요.'),
+      { enableHighAccuracy: false, timeout: 10000 },
+    );
+    return undefined;
+  }, []);
+  const { data: rankingTracks = [], isLoading: isRankingLoading, isError: isRankingError, refetch: refetchRankings } = useQuery({
+    queryKey: ['music-rankings', rankingScope],
+    queryFn: () => getMusicRankings({ scope: rankingScope, limit: 50, ...location }),
+    enabled: rankingScope === 'GLOBAL' || Boolean(location),
+    select: (result) => ({ ...result, items: result.items.map(normalizeRankingTrack) }),
+  });
+  const rankingItems = rankingTracks.items ?? [];
+  const rawLocationLabel = rankingTracks.locationLabel;
+  const locationLabel = rawLocationLabel && !rawLocationLabel.includes('인기곡') && rawLocationLabel !== '전체'
+    ? rawLocationLabel
+    : '현재 위치';
   const [commutePlaylist] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
@@ -25,9 +52,7 @@ function Home() {
     }
   });
 
-  const visibleTracks = showAllTracks
-    ? tracks
-    : tracks.slice(0, 5);
+  const visibleTracks = showAllTracks ? rankingItems : rankingItems.slice(0, 5);
 
   return (
     <div className="space-y-6 px-4 pb-6 pt-4">
@@ -156,7 +181,7 @@ function Home() {
           <div className="min-w-0">
             <h2 className="flex items-center gap-1.5 text-base font-extrabold text-white">
               <MapPin size={17} className="shrink-0 text-spotify-green" />
-              성수동 주변 인기곡 TOP 50
+              {rankingScope === 'GLOBAL' ? '전체 인기곡 TOP 50' : `${locationLabel} 주변 인기곡 TOP 50`}
             </h2>
 
             <p className="mt-1 text-[10px] text-spotify-subtext">
@@ -167,13 +192,25 @@ function Home() {
           <IconButton
             label="인기곡 새로고침"
             size="sm"
-            onClick={() => console.log('인기곡 새로고침')}
+            onClick={() => refetchRankings()}
           >
             <RefreshCw size={15} />
           </IconButton>
         </div>
 
-        <div className="space-y-1">
+        <div className="mb-3 grid grid-cols-2 rounded-xl bg-white/5 p-1">
+          {[['GLOBAL', '전체 인기곡'], ['NEARBY', '주변 인기곡']].map(([scope, label]) => (
+            <button key={scope} type="button" onClick={() => { setRankingScope(scope); setShowAllTracks(false); }} className={`rounded-lg px-3 py-2 text-xs font-bold transition ${rankingScope === scope ? 'bg-spotify-green text-black' : 'text-spotify-subtext hover:text-white'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {isRankingLoading && <p className="py-6 text-center text-xs text-spotify-subtext">인기곡을 불러오는 중이에요...</p>}
+        {isRankingError && <p role="alert" className="py-6 text-center text-xs text-amber-300">인기곡을 불러오지 못했어요.</p>}
+        {rankingScope === 'NEARBY' && locationError && <p role="alert" className="py-6 text-center text-xs text-amber-300">{locationError}</p>}
+        {!isRankingLoading && !isRankingError && visibleTracks.length === 0 && <p className="py-6 text-center text-xs text-spotify-subtext">집계된 인기곡이 아직 없어요.</p>}
+        {!isRankingLoading && !isRankingError && <div className="space-y-1">
           {visibleTracks.map((track) => (
             <button
               key={track.id}
@@ -212,7 +249,7 @@ function Home() {
               </span>
             </button>
           ))}
-        </div>
+        </div>}
 
         <Button
           type="button"
