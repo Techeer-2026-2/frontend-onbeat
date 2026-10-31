@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -6,10 +6,10 @@ import {
   Share2, Shuffle, Music2, Trash2,
 } from 'lucide-react';
 
-import { deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail, updatePlaylist, updatePlaylistTrackOrder } from '../api/playlists';
+import { addTracksToPlaylist, deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail, updatePlaylist, updatePlaylistTrackOrder } from '../api/playlists';
+import { normalizeMusicTrack, searchMusic } from '../api/music';
 import { getApiErrorMessage } from '../api/client';
 import { createPlaylistShare } from '../api/playlistShares';
-import { playlistTracks as MASTER_TRACKS, recommendedTracks } from '../mocks/tracks';
 
 
 const fmt = (sec) => `${Math.floor(sec / 60)}분`;
@@ -42,6 +42,11 @@ function PlaylistDetail() {
   const [isOrderingTracks, setIsOrderingTracks] = useState(false);
   const [notice, setNotice] = useState('');
   const [isSharing, setIsSharing] = useState(false);
+  const [showTrackPicker, setShowTrackPicker] = useState(false);
+  const [trackQuery, setTrackQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearchingTracks, setIsSearchingTracks] = useState(false);
+  const [addingTrackId, setAddingTrackId] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['playlist', playlistId, memberId],
@@ -55,11 +60,20 @@ function PlaylistDetail() {
     const rawTracks = playlistData.tracks ?? playlistData.trackList ?? playlistData.items ?? [];
     return Array.isArray(rawTracks) ? rawTracks.map(normalizeTrack) : [];
   }, [data]);
-  const available = useMemo(
-    () => MASTER_TRACKS.filter((track) => !tracks.some((added) => added.id === track.id)).slice(0, 5),
-    [tracks],
-  );
-  const title = playlist.name ?? playlist.title ?? `내 플레이리스트 #${playlistId}`;
+  useEffect(() => {
+    if (!showTrackPicker || !trackQuery.trim()) { Promise.resolve().then(() => setSearchResults([])); return undefined; }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setIsSearchingTracks(true);
+      searchMusic(trackQuery).then((items) => {
+        if (!cancelled) setSearchResults(items.map(normalizeMusicTrack));
+      }).catch(() => { if (!cancelled) setSearchResults([]); }).finally(() => {
+        if (!cancelled) setIsSearchingTracks(false);
+      });
+    }, 300);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [showTrackPicker, trackQuery]);
+  const title = playlist.name ?? playlist.title ?? '플레이리스트';
   const cover = playlist.coverImageUrl ?? playlist.imageUrl ?? playlist.cover ?? tracks[0]?.art ?? '';
   const totalSec = tracks.reduce((sum, track) => sum + track.durationSec, 0);
 
@@ -184,6 +198,27 @@ function PlaylistDetail() {
     }
   };
 
+  const handleAddTrack = async (track) => {
+    if (addingTrackId != null) return;
+    setAddingTrackId(track.id);
+    try {
+      await addTracksToPlaylist(playlistId, memberId, [{
+        itunesTrackId: Number(track.itunesTrackId ?? track.id),
+        trackName: track.title,
+        artistName: track.artist,
+        collectionName: track.collectionName ?? '',
+        artworkUrl: track.image ?? '',
+        previewUrl: track.previewUrl ?? '',
+        trackTimeMillis: Number(track.trackTimeMillis ?? 0),
+        genre: track.genre ?? 'Unknown',
+      }]);
+      await queryClient.invalidateQueries({ queryKey: ['playlist', playlistId, memberId] });
+      setNotice(`'${track.title}' 곡을 추가했습니다.`);
+    } catch (error) {
+      setNotice(getApiErrorMessage(error, '곡 추가에 실패했어요.'));
+    } finally { setAddingTrackId(null); }
+  };
+
   return (
     <div className="relative min-h-full bg-spotify-black px-4 pb-8 pt-2 text-white">
       <div className="mb-3 flex items-center justify-between">
@@ -220,7 +255,7 @@ function PlaylistDetail() {
       </div>
 
       <div className="mb-5 grid grid-cols-4 gap-2">
-        <button type="button" onClick={() => navigate('/search')} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10"><Plus size={16} />추가</button>
+        <button type="button" onClick={() => setShowTrackPicker(true)} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10"><Plus size={16} />추가</button>
         <button type="button" onClick={handleUpdatePlaylist} disabled={isUpdatingPlaylist} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10 disabled:opacity-50"><ListMusic size={16} />{isUpdatingPlaylist ? '저장 중' : '수정'}</button>
         <button type="button" onClick={handleToggleTrackOrder} disabled={isOrderingTracks || tracks.length < 2} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10 disabled:opacity-50"><Check size={16} />{isOrderingTracks ? '저장 중' : '정렬'}</button>
         <button type="button" onClick={() => window.alert(`플레이리스트 이름: ${title}`)} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[10px] font-bold hover:bg-white/10"><MoreHorizontal size={16} />정보</button>
@@ -257,24 +292,9 @@ function PlaylistDetail() {
       <section className="space-y-3 pt-2">
         <h2 className="text-sm font-extrabold">추천 곡</h2>
         <p className="-mt-2 text-[11px] text-spotify-subtext">이 플레이리스트의 곡 기준</p>
-        {available.length > 0 ? available.map((track) => (
-          <div key={track.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-spotify-card/50 p-2 transition hover:bg-white/5">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <img src={track.art} alt="" className="h-11 w-11 shrink-0 rounded-md object-cover shadow" />
-              <div className="min-w-0"><p className="truncate text-xs font-bold">{track.title}</p><p className="truncate text-[11px] text-spotify-subtext">{track.artist}</p></div>
-            </div>
-            <button type="button" aria-label={`${track.title} 추가`} className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/20 transition hover:border-spotify-green hover:text-spotify-green"><Plus size={16} /></button>
-          </div>
-        )) : recommendedTracks.map((track) => (
-          <div key={track.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-spotify-card/50 p-2 transition hover:bg-white/5">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <img src={track.art} alt="" className="h-11 w-11 shrink-0 rounded-md object-cover shadow" />
-              <div className="min-w-0"><p className="truncate text-xs font-bold">{track.title}</p><p className="truncate text-[11px] text-spotify-subtext">{track.artist}</p></div>
-            </div>
-            <button type="button" aria-label={`${track.title} 추가`} className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/20 transition hover:border-spotify-green hover:text-spotify-green"><Plus size={16} /></button>
-          </div>
-        ))}
+        <p className="text-xs text-spotify-subtext">곡 추가 버튼으로 실제 음악 검색 결과를 확인하세요.</p>
       </section>
+      {showTrackPicker && <div className="fixed inset-0 z-60 flex flex-col bg-spotify-black"><div className="border-b border-white/10 p-4"><div className="mb-3 flex items-center justify-between"><h2 className="font-bold">곡 추가</h2><button type="button" onClick={() => setShowTrackPicker(false)}>닫기</button></div><input autoFocus value={trackQuery} onChange={(event) => setTrackQuery(event.target.value)} placeholder="곡 제목이나 아티스트 검색" className="w-full rounded-xl bg-spotify-card px-3 py-3 text-sm outline-none" /></div><div className="flex-1 space-y-2 overflow-y-auto p-4">{isSearchingTracks && <p className="text-center text-xs text-spotify-subtext">검색 중...</p>}{searchResults.map((track) => <div key={track.id} className="flex items-center gap-3 rounded-xl bg-spotify-card p-2"><img src={track.image} alt="" className="h-11 w-11 rounded-md object-cover" /><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold">{track.title}</p><p className="truncate text-xs text-spotify-subtext">{track.artist}</p></div><button type="button" onClick={() => handleAddTrack(track)} disabled={addingTrackId === track.id} className="rounded-full border border-white/20 px-3 py-2 text-xs">{addingTrackId === track.id ? '추가 중' : '추가'}</button></div>)}</div></div>}
     </div>
   );
 }
