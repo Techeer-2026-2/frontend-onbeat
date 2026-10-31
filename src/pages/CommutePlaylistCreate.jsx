@@ -14,14 +14,26 @@ const locationCoordinates = {
   강남역: { latitude: 37.4979, longitude: 127.0276 },
   판교역: { latitude: 37.3947, longitude: 127.1112 },
 };
+const defaultOriginCoordinates = { latitude: 37.4979, longitude: 127.0276 };
+
+function getStoredCommuteProfileId() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('onbeat-commute-profile') || 'null');
+    return saved?.commuteProfileId ?? saved?.profileId ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export default function CommutePlaylistCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const memberId = getMemberId();
+  const configuredProfileId = import.meta.env.VITE_TEST_COMMUTE_PROFILE_ID || getStoredCommuteProfileId();
+  const commuteProfileId = configuredProfileId == null ? null : Number(configuredProfileId);
   const createMutation = useMutation({
-    mutationFn: ({ memberId, name }) =>
-      generateRecommendedPlaylist(memberId, { name }),
+    mutationFn: ({ memberId, payload }) =>
+      generateRecommendedPlaylist(memberId, payload),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['playlists'] });
     },
@@ -100,16 +112,30 @@ export default function CommutePlaylistCreate() {
       return;
     }
 
-    // 현재 Swagger에서 확인된 생성 요청 필드(name)를 전송한다.
-    // 추천 생성 API의 Request Body가 다르면 이 payload를 명세에 맞춰 조정해야 한다.
+    if (!Number.isSafeInteger(commuteProfileId) || commuteProfileId <= 0) {
+      setMessage('통근 프로필을 먼저 등록하거나 .env.local에 유효한 VITE_TEST_COMMUTE_PROFILE_ID를 설정해 주세요.');
+      return;
+    }
+
+    const playlistName = `${title} (${origin.trim()}→${destination.trim()})`;
     createMutation.mutate(
-      { memberId, name: `${title} (${origin.trim()}→${destination.trim()})` },
+      {
+        memberId,
+        payload: {
+          commuteProfileId,
+          name: playlistName,
+          size: tracks.length,
+          latitude: defaultOriginCoordinates.latitude,
+          longitude: defaultOriginCoordinates.longitude,
+        },
+      },
       {
         onSuccess: (result) => {
+          const generated = result?.data ?? result?.playlist ?? result;
           const playlist = {
-            ...result,
-            id: result?.id ?? `commute-${Date.now()}`,
-            title: result?.name ?? `${title} (${origin.trim()}→${destination.trim()})`,
+            ...generated,
+            id: generated?.id ?? `commute-${Date.now()}`,
+            title: generated?.name ?? playlistName,
             owner: 'ONBEAT Commute',
             type: 'commute',
             isCommute: true,
