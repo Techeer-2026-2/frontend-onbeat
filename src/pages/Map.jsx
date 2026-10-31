@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { cancelCommuteSession, completeCommuteSession, startCommuteSession } from '../api/commuteSessions';
+import { getApiErrorMessage, getMemberId } from '../api/client';
 import {
   MapPin,
   Navigation,
@@ -88,6 +90,10 @@ function Map() {
   const [transitMode, setTransitMode] = useState('subway');
   const [isEditingRoute, setIsEditingRoute] = useState(false);
   const [isCommuting, setIsCommuting] = useState(false);
+  const [commuteSession, setCommuteSession] = useState(null);
+  const [sessionError, setSessionError] = useState('');
+  const [isSessionPending, setIsSessionPending] = useState(false);
+  const memberId = getMemberId();
 
   const selectedMode = transitModes.find(
     (mode) => mode.id === transitMode
@@ -110,8 +116,53 @@ function Map() {
     setIsCommuting(false);
   };
 
-  const handleToggleCommute = () => {
-    setIsCommuting((previous) => !previous);
+  const handleToggleCommute = async () => {
+    if (isSessionPending) return;
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) {
+      setSessionError('.env.local에 유효한 VITE_TEST_MEMBER_ID를 설정해 주세요.');
+      return;
+    }
+
+    setIsSessionPending(true);
+    setSessionError('');
+    try {
+      if (!isCommuting) {
+        const response = await startCommuteSession(memberId, {
+          origin,
+          destination,
+          transportMode: transitMode.toUpperCase(),
+        });
+        const session = response?.data ?? response?.session ?? response;
+        setCommuteSession(session);
+        setIsCommuting(true);
+      } else {
+        const sessionId = commuteSession?.id ?? commuteSession?.sessionId;
+        if (sessionId == null) throw new Error('통근 세션 ID를 확인할 수 없습니다.');
+        await completeCommuteSession(sessionId, memberId);
+        setCommuteSession(null);
+        setIsCommuting(false);
+      }
+    } catch (error) {
+      setSessionError(getApiErrorMessage(error, '통근 세션 요청에 실패했어요.'));
+    } finally {
+      setIsSessionPending(false);
+    }
+  };
+
+  const handleCancelCommute = async () => {
+    const sessionId = commuteSession?.id ?? commuteSession?.sessionId;
+    if (sessionId == null || isSessionPending) return;
+    setIsSessionPending(true);
+    setSessionError('');
+    try {
+      await cancelCommuteSession(sessionId, memberId);
+      setCommuteSession(null);
+      setIsCommuting(false);
+    } catch (error) {
+      setSessionError(getApiErrorMessage(error, '통근 세션 취소에 실패했어요.'));
+    } finally {
+      setIsSessionPending(false);
+    }
   };
 
   return (
@@ -327,9 +378,15 @@ function Map() {
                 <Play size={20} fill="currentColor" />
               )}
 
-              {isCommuting ? '통근 중단' : '출근 시작'}
+              {isSessionPending ? '처리 중...' : (isCommuting ? '통근 완료' : '출근 시작')}
             </span>
           </Button>
+          {isCommuting && (
+            <Button variant="secondary" size="md" className="w-full" onClick={handleCancelCommute} disabled={isSessionPending}>
+              통근 세션 취소
+            </Button>
+          )}
+          {sessionError && <p role="alert" className="rounded-xl border border-red-400/30 bg-red-400/10 p-3 text-xs text-red-200">{sessionError}</p>}
         </>
       )}
 
