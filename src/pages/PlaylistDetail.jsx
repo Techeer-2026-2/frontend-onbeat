@@ -47,6 +47,7 @@ function PlaylistDetail() {
   });
 
   const playlist = data?.data ?? data?.playlist ?? data ?? {};
+
   const tracks = useMemo(
     () => {
       const playlistData = data?.data ?? data?.playlist ?? data ?? {};

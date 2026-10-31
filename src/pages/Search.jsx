@@ -1,26 +1,68 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Music2, Search as SearchIcon, Play, X } from 'lucide-react';
+import { searchMusic, normalizeMusicTrack } from '../api/music';
 
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import IconButton from '../components/common/IconButton';
 import { searchCategories as categories } from '../mocks/content';
-import { searchTracks as tracks } from '../mocks/tracks';
+
+function useDebouncedValue(value, delay = 300) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedValue(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 function Search() {
   const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const debouncedQuery = useDebouncedValue(query);
 
-  const normalizedQuery = query.trim().toLowerCase();
-
-  const searchResults = normalizedQuery
-    ? tracks.filter(
-        (track) =>
-          track.title.toLowerCase().includes(normalizedQuery) ||
-          track.artist.toLowerCase().includes(normalizedQuery),
-      )
-    : [];
+  const normalizedQuery = query.trim();
 
   const isSearching = normalizedQuery.length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    const term = debouncedQuery.trim();
+
+    if (!term) {
+      return undefined;
+    }
+
+    Promise.resolve()
+      .then(() => {
+        if (cancelled) return null;
+        setIsLoading(true);
+        setSearchError('');
+        return searchMusic(term);
+      })
+      .then((tracks) => {
+        if (!tracks) return;
+        if (!cancelled) setSearchResults(tracks.map(normalizeMusicTrack));
+      })
+      .catch((error) => {
+        console.error('Music search failed:', error);
+        if (!cancelled) {
+          setSearchResults([]);
+          setSearchError('음악 검색에 실패했어요. 잠시 후 다시 시도해 주세요.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery]);
 
   const handlePlayClick = (track) => {
     console.log('선택한 곡:', track.title, track.artist);
@@ -130,7 +172,15 @@ function Search() {
             </IconButton>
           </div>
 
-          {searchResults.length > 0 ? (
+          {isLoading ? (
+            <Card padding="lg" className="py-10 text-center">
+              <p className="text-sm font-bold text-white">음악을 검색하고 있어요...</p>
+            </Card>
+          ) : searchError ? (
+            <Card padding="lg" className="py-10 text-center">
+              <p role="alert" className="text-sm font-bold text-white">{searchError}</p>
+            </Card>
+          ) : searchResults.length > 0 ? (
             <div className="space-y-1">
               {searchResults.map((track) => (
                 <div
