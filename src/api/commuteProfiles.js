@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import apiClient, { memberParams } from './client';
+/*
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { generateRecommendedPlaylist } from '../api/playlists';
@@ -215,4 +216,29 @@ export default function CommutePlaylistCreate() {
     {showAdd && <div className="fixed inset-0 z-100 flex flex-col bg-spotify-black"><div className="border-b border-white/10 px-4 pb-3 pt-4"><div className="mx-auto mb-4 h-1 w-10 rounded-full bg-neutral-600"/><div className="mb-3 flex items-center justify-between"><h2 className="text-base font-extrabold">플레이리스트에 추가하기</h2><button onClick={()=>setShowAdd(false)} aria-label="닫기"><X size={22}/></button></div><div className="flex items-center gap-2 rounded-xl border border-white/10 bg-spotify-card px-3"><Search size={16} className="text-spotify-subtext"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="무엇을 추가하시겠어요?" className="w-full bg-transparent py-3 text-xs outline-none"/></div></div><div className="flex-1 space-y-1 overflow-y-auto p-4">{filteredTracks.map(track=>{const added=tracks.some(t=>t.id===track.id);return <div key={track.id} className="flex items-center gap-3 border-b border-white/5 p-2"><img src={track.art} alt="" className="h-12 w-12 rounded-md object-cover"/><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold">{track.title}</p><p className="mt-0.5 text-[11px] text-spotify-subtext">{track.artist}</p></div><button onClick={()=>addTrack(track)} className={`flex h-9 w-9 items-center justify-center rounded-full ${added?'bg-spotify-green text-black':'border border-white/20 text-white hover:border-spotify-green hover:text-spotify-green'}`} aria-label={added?'이미 추가됨':'곡 추가'}>{added?<CheckCircle2 size={18}/>:<Plus size={18}/>}</button></div>})}</div><div className="border-t border-white/10 bg-spotify-dark p-4"><button onClick={()=>setShowAdd(false)} className="w-full rounded-full bg-white py-3 text-xs font-extrabold text-black">완료</button></div></div>}
   </div>;
 }
+*/
+
+export const getCommuteProfiles = async (memberId) => {
+  const response = await apiClient.get('/commute-profiles', { params: memberParams(memberId) });
+  return response.data;
+};
+
+export const getCommuteProfile = async (profileId, memberId) => {
+  const response = await apiClient.get(`/commute-profiles/${profileId}`, { params: memberParams(memberId) });
+  return response.data;
+};
+
+export const createCommuteProfile = async (memberId, payload) => {
+  const response = await apiClient.post('/commute-profiles', payload, { params: memberParams(memberId) });
+  return response.data;
+};
+
+export const updateCommuteProfile = async (profileId, memberId, payload) => {
+  const response = await apiClient.patch(`/commute-profiles/${profileId}`, payload, { params: memberParams(memberId) });
+  return response.data;
+};
+
+export const deleteCommuteProfile = async (profileId, memberId) => (
+  apiClient.delete(`/commute-profiles/${profileId}`, { params: memberParams(memberId) })
+);
 
