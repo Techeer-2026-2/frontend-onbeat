@@ -46,7 +46,7 @@ function Library() {
   const savedPlaylistItems = useMemo(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
-      return saved.filter((playlist) => !isCommutePlaylist(playlist)).map((playlist) => ({
+      return saved.filter((playlist) => !isCommutePlaylist(playlist) && !isPlaceholderPlaylist(playlist)).map((playlist) => ({
         id: playlist.id,
         title: playlist.title,
         subtitle: playlist.description || `내 플레이리스트 · ${playlist.tracks?.length || 0}곡`,
@@ -66,9 +66,9 @@ function Library() {
       : Array.isArray(playlistResponse?.data)
         ? playlistResponse.data
         : [];
-    return serverPlaylists.filter((playlist) => !isCommutePlaylist(playlist)).map((playlist) => ({
+    return serverPlaylists.filter((playlist) => !isCommutePlaylist(playlist) && !isPlaceholderPlaylist(playlist)).map((playlist) => ({
       id: String(playlist.id),
-      title: playlist.name,
+      title: playlist.name ?? playlist.title ?? '플레이리스트',
       subtitle: '내 플레이리스트',
       type: 'playlist',
       image: null,
@@ -300,4 +300,8 @@ function isCommutePlaylist(playlist) {
   return playlist?.isCommute === true
     || playlist?.type === 'commute'
     || /^출근 맞춤 플레이리스트/.test(playlist?.name ?? playlist?.title ?? '');
+}
+
+function isPlaceholderPlaylist(playlist) {
+  return /^내 플레이리스트 #\d+$/.test(playlist?.name ?? playlist?.title ?? '');
 }
