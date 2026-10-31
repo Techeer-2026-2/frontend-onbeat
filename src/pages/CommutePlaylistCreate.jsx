@@ -2,11 +2,17 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { generateRecommendedPlaylist } from '../api/playlists';
+import { createCommuteProfile, getCommuteProfiles } from '../api/commuteProfiles';
 import { playlistTracks as TRACKS } from '../mocks/tracks';
-import { ArrowLeft, CheckCircle2, ChevronRight, Clock3, MapPin, Navigation, Plus, Route, Search, Share2, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock3, MapPin, Plus, Route, Search, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
 
 const modes = [{ label: '지하철', Icon: Train }, { label: '버스', Icon: Bus }, { label: '도보', Icon: Footprints }, { label: '자차', Icon: Car }];
 const mins = (sec) => Math.round(sec / 60);
+const transportModeMap = { 지하철: 'SUBWAY', 버스: 'BUS', 도보: 'WALK', 자차: 'CAR' };
+const locationCoordinates = {
+  강남역: { latitude: 37.4979, longitude: 127.0276 },
+  판교역: { latitude: 37.3947, longitude: 127.1112 },
+};
 
 export default function CommutePlaylistCreate() {
   const navigate = useNavigate();
@@ -14,8 +20,26 @@ export default function CommutePlaylistCreate() {
   const rawMemberId = import.meta.env.VITE_TEST_MEMBER_ID;
   const memberId = rawMemberId ? Number(rawMemberId) : undefined;
   const createMutation = useMutation({
-    mutationFn: ({ memberId, name }) =>
-      generateRecommendedPlaylist(memberId, { name }),
+    mutationFn: async ({ memberId, name, profilePayload, playlistPayload }) => {
+      const profilesResponse = await getCommuteProfiles(memberId);
+      const profiles = Array.isArray(profilesResponse)
+        ? profilesResponse
+        : Array.isArray(profilesResponse?.data) ? profilesResponse.data : [];
+      const existingProfile = profiles.find((profile) =>
+        profile.frequentRouteName === profilePayload.frequentRouteName
+        && profile.transportMode === profilePayload.transportMode
+      );
+      const profile = existingProfile ?? await createCommuteProfile(memberId, profilePayload);
+      const commuteProfileId = profile?.id ?? profile?.profileId;
+      if (!Number.isSafeInteger(Number(commuteProfileId)) || Number(commuteProfileId) <= 0) {
+        throw new Error('통근 프로필 생성 응답에서 ID를 확인하지 못했습니다.');
+      }
+      const result = await generateRecommendedPlaylist(memberId, {
+        ...playlistPayload,
+        commuteProfileId: Number(commuteProfileId),
+      });
+      return { result, commuteProfileId: Number(commuteProfileId), name };
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['playlists'] });
     },
@@ -23,8 +47,8 @@ export default function CommutePlaylistCreate() {
   const [origin, setOrigin] = useState('강남역');
   const [destination, setDestination] = useState('판교역');
   const [mode, setMode] = useState('지하철');
-  const [duration, setDuration] = useState(32);
-  const [title, setTitle] = useState('출근 맞춤 플레이리스트');
+  const [duration] = useState(32);
+  const [title] = useState('출근 맞춤 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [search, setSearch] = useState('');
   const [showAdd, setShowAdd] = useState(false);
@@ -57,22 +81,46 @@ export default function CommutePlaylistCreate() {
       return;
     }
 
-    // 현재 Swagger에서 확인된 생성 요청 필드(name)를 전송한다.
-    // 추천 생성 API의 Request Body가 다르면 이 payload를 명세에 맞춰 조정해야 한다.
+    const start = locationCoordinates[origin.trim()];
+    const end = locationCoordinates[destination.trim()];
+    if (!start || !end) {
+      setMessage('현재는 지원되는 장소 좌표가 없어 통근 프로필을 만들 수 없습니다.');
+      return;
+    }
+    const playlistName = `${title} (${origin.trim()}→${destination.trim()})`;
+    const profilePayload = {
+      commuteType: 'TO_WORK',
+      transportMode: transportModeMap[mode],
+      frequentRouteName: `${origin.trim()} → ${destination.trim()}`,
+      departure: { ...start, placeName: origin.trim() },
+      arrival: { ...end, placeName: destination.trim() },
+    };
     createMutation.mutate(
-      { memberId, name: `${title} (${origin.trim()}→${destination.trim()})` },
       {
-        onSuccess: (result) => {
+        memberId,
+        name: playlistName,
+        profilePayload,
+        playlistPayload: {
+          name: playlistName,
+          size: tracks.length,
+          latitude: start.latitude,
+          longitude: start.longitude,
+        },
+      },
+      {
+        onSuccess: ({ result, commuteProfileId }) => {
+          const generated = result?.data ?? result?.playlist ?? result;
           const playlist = {
-            ...result,
-            id: result?.id ?? `commute-${Date.now()}`,
-            title: result?.name ?? `${title} (${origin.trim()}→${destination.trim()})`,
+            ...generated,
+            id: generated?.id ?? `commute-${Date.now()}`,
+            title: generated?.name ?? playlistName,
             owner: 'ONBEAT Commute',
             type: 'commute',
             isCommute: true,
             origin: origin.trim(),
             destination: destination.trim(),
             mode,
+            commuteProfileId,
             commuteMinutes: duration,
             tracks,
             totalSeconds: total,

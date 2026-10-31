@@ -5,6 +5,7 @@ const PAGE_TITLES = {
   '/home': 'ONBEAT',
   '/search': '검색',
   '/library': '내 라이브러리',
+  '/map': '통근 지도',
   '/playlist/create': '플레이리스트 만들기',
 };
 

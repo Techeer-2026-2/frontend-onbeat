@@ -4,8 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { addTracksToPlaylist, generateCustomPlaylist } from '../api/playlists';
 import { playlistTracks as MASTER_TRACKS } from '../mocks/tracks';
 import {
-  ArrowLeft, Check, ChevronDown, Globe, ListMusic, Plus, Search, Share2,
-  Music2, X, Trash2, Play,
+  ArrowLeft, Check, Globe, ListMusic, Plus, Search,
+  Music2, X, Trash2,
 } from 'lucide-react';
 
 const fmt = (sec) => `${Math.floor(sec / 60)}분`;

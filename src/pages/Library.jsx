@@ -39,11 +39,6 @@ function Library() {
     enabled: Number.isSafeInteger(memberId) && memberId > 0,
   });
 
-  const serverPlaylists = Array.isArray(playlistResponse)
-    ? playlistResponse
-    : Array.isArray(playlistResponse?.data)
-      ? playlistResponse.data
-      : [];
   const [activeFilter, setActiveFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -65,15 +60,22 @@ function Library() {
     }
   }, []);
 
-  const serverPlaylistItems = useMemo(() => serverPlaylists.filter((playlist) => !isCommutePlaylist(playlist)).map((playlist) => ({
-    id: String(playlist.id),
-    title: playlist.name,
-    subtitle: '내 플레이리스트',
-    type: 'playlist',
-    image: null,
-    icon: 'playlist',
-    count: `${playlist.trackCount ?? 0}곡`,
-  })), [serverPlaylists]);
+  const serverPlaylistItems = useMemo(() => {
+    const serverPlaylists = Array.isArray(playlistResponse)
+      ? playlistResponse
+      : Array.isArray(playlistResponse?.data)
+        ? playlistResponse.data
+        : [];
+    return serverPlaylists.filter((playlist) => !isCommutePlaylist(playlist)).map((playlist) => ({
+      id: String(playlist.id),
+      title: playlist.name,
+      subtitle: '내 플레이리스트',
+      type: 'playlist',
+      image: null,
+      icon: 'playlist',
+      count: `${playlist.trackCount ?? 0}곡`,
+    }));
+  }, [playlistResponse]);
 
   const visibleItems = useMemo(() => {
     const serverIds = new Set(serverPlaylistItems.map((item) => item.id));
