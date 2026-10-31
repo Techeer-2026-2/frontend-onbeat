@@ -5,6 +5,7 @@ import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
 import { getMusicRankings, normalizeRankingTrack } from '../api/rankings';
+import { getAdBanners, normalizeAdBanner, recordAdClick } from '../api/ads';
 import {
   Disc3,
   MapPin,
@@ -18,6 +19,11 @@ import {
 function Home() {
   const [showAllTracks, setShowAllTracks] = useState(false);
   const [rankingScope, setRankingScope] = useState('NEARBY');
+  const { data: adBanners = [], isLoading: isAdLoading } = useQuery({
+    queryKey: ['ad-banners'],
+    queryFn: getAdBanners,
+    select: (items) => items.map(normalizeAdBanner),
+  });
   const [location, setLocation] = useState(null);
   const [locationError, setLocationError] = useState('');
   useEffect(() => {
@@ -53,6 +59,24 @@ function Home() {
   });
 
   const visibleTracks = showAllTracks ? rankingItems : rankingItems.slice(0, 5);
+  const adBanner = adBanners[0] ?? {
+    id: 'fallback-banner',
+    title: 'KILL THIS LOVE',
+    subtitle: 'BLACKPINK · 2nd MINI ALBUM',
+    image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800',
+    badge: 'COMEBACK SINGLE',
+    label: 'RELEASE',
+    targetUrl: '',
+  };
+  const handleAdClick = async () => {
+    if (!adBanner) return;
+    try {
+      await recordAdClick(adBanner.id);
+    } catch (error) {
+      console.error('Ad click event failed:', error);
+    }
+    if (adBanner.targetUrl) window.open(adBanner.targetUrl, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="space-y-6 px-4 pb-6 pt-4">
@@ -69,14 +93,15 @@ function Home() {
           </Badge>
         </div>
 
-        <button
+        {isAdLoading && <div className="aspect-square w-full animate-pulse rounded-2xl bg-white/10" />}
+        {adBanner && <button
           type="button"
-          onClick={() => console.log('광고 클릭')}
-          aria-label="BLACKPINK 컴백 프로모션 자세히 보기"
+          onClick={handleAdClick}
+          aria-label={`${adBanner.title} 자세히 보기`}
           className="group relative block aspect-square w-full overflow-hidden rounded-2xl border border-pink-500/50 bg-black text-left"
         >
           <img
-            src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800"
+            src={adBanner.image}
             alt="콘서트 조명"
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
@@ -91,21 +116,21 @@ function Home() {
                 className="tracking-wider"
               >
                 <Disc3 size={12} className="mr-1 inline" />
-                COMEBACK SINGLE
+                {adBanner.badge}
               </Badge>
 
               <span className="rounded-md border border-pink-500/40 bg-black/70 px-2 py-1 text-[10px] font-bold text-pink-400">
-                RELEASE
+                {adBanner.label}
               </span>
             </div>
 
             <div>
               <p className="mb-2 text-xs font-black tracking-widest text-pink-400">
-                BLACKPINK · 2nd MINI ALBUM
+                {adBanner.subtitle}
               </p>
 
               <h2 className="text-3xl font-black leading-tight tracking-tight text-white">
-                KILL THIS LOVE
+                {adBanner.title}
               </h2>
 
               <div className="mt-3 rounded-lg border border-pink-500/20 bg-black/70 p-3">
@@ -114,7 +139,7 @@ function Home() {
                   타이틀곡 Pre-Listen
                 </p>
                 <p className="text-xs text-neutral-200">
-                  강렬한 브라스와 중독성 있는 드럼 비트!
+                  {adBanner.subtitle || '새로운 음악과 프로모션을 만나보세요.'}
                 </p>
               </div>
 
@@ -124,7 +149,7 @@ function Home() {
               </div>
             </div>
           </div>
-        </button>
+        </button>}
       </section>
 
       {/* 통근 맞춤 플레이리스트가 생성된 경우에만 표시 */}
