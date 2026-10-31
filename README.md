@@ -1,4 +1,4 @@
-# 통근길 플레이리스트 - Frontend
+# 통근길 플레이리스트 - Frontend_ONBEAT
 
 통근 정보(노선/소요시간)에 맞춰 음악을 추천하고, 홈 화면에 연령대 기반 배너 광고를 노출하는 플랫폼입니다.
 
@@ -112,13 +112,20 @@ src/
 
 ## 관련 저장소
 
+### 음악 스트리밍 서비스 - ONBEAT
+
+통근 정보에 맞춘 음악 추천 및 광고 배너 노출 기능을 제공하는 사용자용 서비스입니다.
+
+- Repository: [frontend-onbeat](https://github.com/Techeer-2026-2/frontend-onbeat)
+
 ### 백엔드
 
-https://github.com/Techeer-2026-2/backend
+광고 캠페인 관리, 광고 노출 및 클릭 이벤트 수집, 성과 데이터 집계를 위한 백엔드 프로젝트입니다.
 
-### 광고 성과 분석
+- Repository: [backend](https://github.com/Techeer-2026-2/backend)
 
-광고 성과 분석 및 캠페인 관리 기능은 별도의 프론트엔드 프로젝트로 관리합니다.
+### 광고 성과 분석 - ONAD
 
-- Repository: `frontend-adlytic`
-```
+광고주를 위한 캠페인 관리 및 광고 성과 분석 프론트엔드입니다.
+
+- Repository: [frontend-onad](https://github.com/Techeer-2026-2/frontend-onad)
