@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Music2, Search as SearchIcon, Play, X } from 'lucide-react';
 import { searchMusic, normalizeMusicTrack } from '../api/music';
+import { recordListeningEvent, recordPlaybackEvent } from '../api/playback';
+import { getApiErrorMessage, getMemberId } from '../api/client';
 
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
@@ -23,6 +25,10 @@ function Search() {
   const [searchResults, setSearchResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
+  const [playingTrackId, setPlayingTrackId] = useState(null);
+  const [playbackError, setPlaybackError] = useState('');
+  const audioRef = useRef(null);
+  const memberId = getMemberId();
   const debouncedQuery = useDebouncedValue(query);
 
   const normalizedQuery = query.trim();
@@ -64,8 +70,34 @@ function Search() {
     };
   }, [debouncedQuery]);
 
-  const handlePlayClick = (track) => {
-    console.log('선택한 곡:', track.title, track.artist);
+  const handlePlayClick = async (track) => {
+    if (!track.previewUrl) {
+      setPlaybackError('이 곡은 미리듣기를 제공하지 않아요.');
+      return;
+    }
+    audioRef.current?.pause();
+    const audio = new Audio(track.previewUrl);
+    audioRef.current = audio;
+    setPlayingTrackId(track.id);
+    setPlaybackError('');
+    try {
+      await recordPlaybackEvent(memberId, { trackId: track.itunesTrackId ?? track.id, eventType: 'PLAY' });
+      audio.onended = async () => {
+        setPlayingTrackId(null);
+        try {
+          await recordListeningEvent(memberId, {
+            trackId: track.itunesTrackId ?? track.id,
+            listenedSeconds: Math.round((track.trackTimeMillis ?? 0) / 1000),
+            completed: true,
+          });
+        } catch (error) { console.error('Listening event failed:', error); }
+      };
+      audio.onerror = () => setPlayingTrackId(null);
+      await audio.play();
+    } catch (error) {
+      setPlayingTrackId(null);
+      setPlaybackError(getApiErrorMessage(error, '음악 재생을 시작하지 못했어요.'));
+    }
   };
 
   return (
@@ -153,6 +185,7 @@ function Search() {
       {/* 검색 결과 */}
       {isSearching && (
         <section>
+          {playbackError && <p role="alert" className="mb-2 text-xs text-amber-300">{playbackError}</p>}
           <div className="mb-3 flex items-center justify-between">
             <div>
               <h2 className="text-base font-extrabold text-white">
@@ -211,7 +244,7 @@ function Search() {
                     className="shrink-0"
                   >
                     <Play size={16} fill="currentColor" />
-                    재생
+                    {playingTrackId === track.id ? '재생 중' : '재생'}
                   </Button>
                 </div>
               ))}
