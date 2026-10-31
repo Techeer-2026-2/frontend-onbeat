@@ -99,6 +99,7 @@ function PlaylistCreate() {
             artworkUrl: track.artworkUrl ?? track.art ?? '',
             previewUrl: track.previewUrl ?? '',
             trackTimeMillis: Math.round(durationSec * 1000),
+            genre: track.genre ?? 'Unknown',
           };
         });
         try {

@@ -8,6 +8,14 @@ export const generateCustomPlaylist = async (memberId, payload) => {
   return response.data;
 };
 
+// 플레이리스트 정보 수정
+export const updatePlaylist = async (playlistId, memberId, payload) => {
+  const response = await apiClient.patch(`/playlists/${playlistId}`, payload, {
+    params: memberParams(memberId),
+  });
+  return response.data;
+};
+
 // 플레이리스트에 곡 추가 (성공 시 204 No Content)
 export const addTracksToPlaylist = async (playlistId, memberId, tracks) => {
   const response = await apiClient.post(`/playlists/${playlistId}/tracks`, tracks, {
