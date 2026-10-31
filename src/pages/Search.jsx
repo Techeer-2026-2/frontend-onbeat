@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { Camera, Music2, Search as SearchIcon, Play, X } from 'lucide-react';
+import { Music2, Search as SearchIcon, Play, X } from 'lucide-react';
 
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
-import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
 import { searchCategories as categories } from '../mocks/content';
 import { searchTracks as tracks } from '../mocks/tracks';

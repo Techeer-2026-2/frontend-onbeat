@@ -6,6 +6,7 @@ import {
   Share2, Shuffle, Music2, Trash2,
 } from 'lucide-react';
 import { deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail } from '../api/playlists';
+import { getApiErrorMessage, getMemberId } from '../api/client';
 import { playlistTracks as MASTER_TRACKS, recommendedTracks } from '../mocks/tracks';
 
 
@@ -32,7 +33,7 @@ function PlaylistDetail() {
   const { playlistId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const memberId = Number(import.meta.env.VITE_TEST_MEMBER_ID);
+  const memberId = getMemberId();
   const [deletingTrackId, setDeletingTrackId] = useState(null);
   const [isDeletingPlaylist, setIsDeletingPlaylist] = useState(false);
   const [notice, setNotice] = useState('');
@@ -77,7 +78,7 @@ function PlaylistDetail() {
       setNotice(`'${track.title}' 곡을 플레이리스트에서 삭제했습니다.`);
     } catch (error) {
       console.error('Playlist track deletion failed:', error);
-      setNotice(error?.response?.data?.message || '곡 삭제에 실패했어요.');
+      setNotice(getApiErrorMessage(error, '곡 삭제에 실패했어요.'));
     } finally {
       setDeletingTrackId(null);
     }
@@ -103,7 +104,7 @@ function PlaylistDetail() {
       navigate('/library', { replace: true });
     } catch (error) {
       console.error('Playlist deletion failed:', error);
-      setNotice(error?.response?.data?.message || '플레이리스트 삭제에 실패했어요.');
+      setNotice(getApiErrorMessage(error, '플레이리스트 삭제에 실패했어요.'));
     } finally {
       setIsDeletingPlaylist(false);
     }
