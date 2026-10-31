@@ -17,6 +17,57 @@ const locationCoordinates = {
   판교역: { latitude: 37.3947, longitude: 127.1112 },
 };
 
+// 카카오맵 SDK를 불러와 출발·도착 지점과 연결선을 그린다. 키는 VITE_KAKAO_JS_KEY 로 받는다.
+function KakaoRouteMap({ start, end }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const key = import.meta.env.VITE_KAKAO_JS_KEY;
+    if (!key || !start || !end) return undefined;
+    let cancelled = false;
+    const draw = () => {
+      if (cancelled || !containerRef.current) return;
+      const kakao = window.kakao;
+      const center = new kakao.maps.LatLng((start.lat + end.lat) / 2, (start.lng + end.lng) / 2);
+      const map = new kakao.maps.Map(containerRef.current, { center, level: 6 });
+      const startLatLng = new kakao.maps.LatLng(start.lat, start.lng);
+      const endLatLng = new kakao.maps.LatLng(end.lat, end.lng);
+      new kakao.maps.Marker({ position: startLatLng, map });
+      new kakao.maps.Marker({ position: endLatLng, map });
+      new kakao.maps.Polyline({
+        path: [startLatLng, endLatLng],
+        strokeWeight: 6,
+        strokeColor: '#1DB954',
+        strokeOpacity: 0.9,
+        map,
+      });
+      const bounds = new kakao.maps.LatLngBounds();
+      bounds.extend(startLatLng);
+      bounds.extend(endLatLng);
+      map.setBounds(bounds);
+    };
+    const load = () => window.kakao.maps.load(draw);
+    if (window.kakao && window.kakao.maps) {
+      load();
+    } else {
+      const existing = document.querySelector('script[data-kakao-sdk]');
+      if (existing) {
+        existing.addEventListener('load', load);
+      } else {
+        const script = document.createElement('script');
+        script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&autoload=false`;
+        script.async = true;
+        script.dataset.kakaoSdk = '1';
+        script.onload = load;
+        document.head.appendChild(script);
+      }
+    }
+    return () => { cancelled = true; };
+  }, [start, end]);
+
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+}
+
 export default function CommutePlaylistCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -193,6 +244,7 @@ export default function CommutePlaylistCreate() {
             mode,
             commuteProfileId,
             commuteMinutes: duration,
+            totalSeconds: generated?.totalDurationSec ?? 0,
             tracks: generated?.tracks ?? generated?.items ?? tracks,
             totalSeconds: total,
             cover: tracks[0]?.art || '',
@@ -215,6 +267,10 @@ export default function CommutePlaylistCreate() {
     );
   };
 
+  const toPoint = (p) => (p ? { lat: p.latitude, lng: p.longitude } : null);
+  const mapStart = toPoint(selectedPlaces.origin ?? locationCoordinates[origin.trim()]);
+  const mapEnd = toPoint(selectedPlaces.destination ?? locationCoordinates[destination.trim()]);
+
   return <div className="relative min-h-full bg-spotify-black px-4 pb-8 pt-2 text-white">
     <div className="mb-4 flex items-center justify-between">
       <button onClick={() => navigate(-1)} aria-label="뒤로 가기" className="flex h-8 w-8 items-center justify-center rounded-full hover:bg-white/10"><ArrowLeft size={23}/></button>
@@ -234,7 +290,7 @@ export default function CommutePlaylistCreate() {
 
     <section className="mb-4 rounded-2xl border border-white/10 bg-spotify-dark p-3.5">
       <div className="mb-3 flex items-center justify-between"><div className="flex items-center gap-2"><span className="rounded-full bg-spotify-green px-2.5 py-1 text-[10px] font-extrabold text-black">통근 경로</span><span className="truncate text-xs font-bold">{origin || '출발지'} → {destination || '도착지'}</span></div><span className="shrink-0 text-[10px] text-spotify-subtext">{mode} · {duration ? `${duration}분` : '-'}</span></div>
-      <div className="map-grid-bg relative flex h-36 items-center justify-center overflow-hidden rounded-xl border border-white/10" style={{backgroundColor:'#161a20',backgroundImage:'radial-gradient(circle, #2a313d 1px, transparent 1px)',backgroundSize:'20px 20px'}}><svg viewBox="0 0 300 140" className="h-full w-full" aria-label="통근 경로 예시"><path d="M 30 25 L 85 50 L 145 72 L 205 95 L 270 118" stroke="#1DB954" strokeWidth="4" strokeLinecap="round" strokeDasharray="4 4" fill="none"/><circle cx="30" cy="25" r="6" fill="#1DB954" stroke="#000" strokeWidth="2"/><circle cx="85" cy="50" r="4" fill="#282828" stroke="#1DB954" strokeWidth="2"/><circle cx="145" cy="72" r="4" fill="#282828" stroke="#1DB954" strokeWidth="2"/><circle cx="205" cy="95" r="4" fill="#282828" stroke="#1DB954" strokeWidth="2"/><circle cx="270" cy="118" r="6" fill="#007AFF" stroke="#000" strokeWidth="2"/><text x="30" y="13" fill="white" fontSize="9" textAnchor="middle">출발</text><text x="270" y="135" fill="white" fontSize="9" textAnchor="middle">도착</text></svg><span className="absolute left-2 top-2 rounded-lg border border-white/10 bg-black/80 px-2 py-1 text-[9px] text-white">경로 미리보기</span></div>
+      <div className="relative h-36 overflow-hidden rounded-xl border border-white/10"><KakaoRouteMap start={mapStart} end={mapEnd} /></div>
       <div className="mt-3 flex items-center justify-between"><div className="flex items-center gap-2"><Clock3 size={17} className="text-spotify-green"/><div><p className="text-[10px] text-spotify-subtext">총 경로 소요시간</p><p className="text-xs font-bold">{isEstimatingRoute ? '계산 중...' : duration ? `${duration}분 소요 (${mode})` : '-'}</p></div></div><span className="rounded-md bg-spotify-green/20 px-2 py-1 text-[10px] font-bold text-spotify-green">{tracks.length}곡 구성</span></div>
     </section>
 
