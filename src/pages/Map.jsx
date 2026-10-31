@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { estimateRoute } from '../api/routes';
 import { cancelCommuteSession, completeCommuteSession, startCommuteSession } from '../api/commuteSessions';
 import { getApiErrorMessage, getMemberId } from '../api/client';
 import {
@@ -82,6 +83,10 @@ function normalizeRouteCoordinates(
 
 // 노선 주변 여백. 값이 커질수록 역들이 표시 구역 중앙으로 모입니다.
 const ROUTE_PADDING = { x: 18, y: 22 };
+const stationCoordinates = {
+  강남역: { startLatitude: 37.4979, startLongitude: 127.0276 },
+  판교역: { endLatitude: 37.3947, endLongitude: 127.1112 },
+};
 
 function Map() {
   const [isRouteConfigured, setIsRouteConfigured] = useState(false);
@@ -90,6 +95,9 @@ function Map() {
   const [transitMode, setTransitMode] = useState('subway');
   const [isEditingRoute, setIsEditingRoute] = useState(false);
   const [isCommuting, setIsCommuting] = useState(false);
+  const [duration, setDuration] = useState(null);
+  const [isEstimating, setIsEstimating] = useState(false);
+  const [estimateError, setEstimateError] = useState('');
   const [commuteSession, setCommuteSession] = useState(null);
   const [sessionError, setSessionError] = useState('');
   const [isSessionPending, setIsSessionPending] = useState(false);
@@ -104,6 +112,35 @@ function Map() {
   const routeLinePoints = normalizedStations
     .map((station) => `${station.x},${station.y}`)
     .join(' ');
+
+  useEffect(() => {
+    if (!isRouteConfigured) return undefined;
+    const originCoordinates = stationCoordinates[origin];
+    const destinationCoordinates = stationCoordinates[destination];
+    if (!originCoordinates || !destinationCoordinates) {
+      Promise.resolve().then(() => {
+        setDuration(null);
+        setEstimateError('출발지와 도착지의 좌표를 확인할 수 없어요.');
+      });
+      return undefined;
+    }
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return null;
+      setIsEstimating(true);
+      setEstimateError('');
+      return estimateRoute({
+      ...originCoordinates,
+      ...destinationCoordinates,
+      transportMode: transitMode.toUpperCase(),
+      });
+    }).then((result) => {
+      if (!cancelled) setDuration(Number(result?.durationMinutes ?? result?.duration ?? 0) || null);
+    }).catch(() => {
+      if (!cancelled) setEstimateError('예상 소요시간을 불러오지 못했어요.');
+    }).finally(() => { if (!cancelled) setIsEstimating(false); });
+    return () => { cancelled = true; };
+  }, [isRouteConfigured, origin, destination, transitMode]);
 
   const handleSaveRoute = () => {
     if (!origin.trim() || !destination.trim()) {
@@ -232,7 +269,7 @@ function Map() {
 
                 <Clock3 size={15} className="shrink-0" />
 
-                <span>32분</span>
+                    <span>{isEstimating ? '계산 중' : duration ? `${duration}분` : '-'}</span>
               </div>
             </div>
 
@@ -323,7 +360,7 @@ function Map() {
                   </p>
 
                   <p className="mt-1 text-sm font-bold text-white">
-                    32분 · {selectedMode.label}
+                    {isEstimating ? '계산 중' : duration ? `${duration}분` : '-'} · {selectedMode.label}
                   </p>
                 </div>
               </div>
@@ -479,6 +516,7 @@ function Map() {
                 </div>
               </div>
             </div>
+            {estimateError && <p role="alert" className="text-xs text-amber-300">{estimateError}</p>}
 
             <div className="mt-7 flex gap-3">
               <Button
