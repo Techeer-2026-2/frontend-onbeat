@@ -47,11 +47,11 @@ function PlaylistDetail() {
   });
 
   const playlist = data?.data ?? data?.playlist ?? data ?? {};
-  const rawTracks = playlist.tracks ?? playlist.trackList ?? playlist.items ?? [];
-  const tracks = useMemo(
-    () => (Array.isArray(rawTracks) ? rawTracks.map(normalizeTrack) : []),
-    [data],
-  );
+  const tracks = useMemo(() => {
+    const playlistData = data?.data ?? data?.playlist ?? data ?? {};
+    const rawTracks = playlistData.tracks ?? playlistData.trackList ?? playlistData.items ?? [];
+    return Array.isArray(rawTracks) ? rawTracks.map(normalizeTrack) : [];
+  }, [data]);
   const available = useMemo(
     () => MASTER_TRACKS.filter((track) => !tracks.some((added) => added.id === track.id)).slice(0, 5),
     [tracks],

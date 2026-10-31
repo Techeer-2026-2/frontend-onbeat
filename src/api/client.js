@@ -3,7 +3,7 @@ import axios from "axios";
 const MEMBER_ID_ENV_KEY = "VITE_TEST_MEMBER_ID";
 
 export const getMemberId = () => {
-  const memberId = Number(import.meta.env[MEMBER_ID_ENV_KEY] || "1");
+  const memberId = Number(import.meta.env.VITE_TEST_MEMBER_ID || "1");
   return Number.isSafeInteger(memberId) && memberId > 0 ? memberId : null;
 };
 
@@ -16,12 +16,8 @@ export const memberParams = (memberId = getMemberId()) => {
 
 export const getApiErrorMessage = (error, fallback = "요청 처리 중 오류가 발생했어요.") => {
   const responseData = error?.response?.data;
-  if (typeof responseData?.message === "string" && responseData.message.trim()) {
-    return responseData.message;
-  }
-  if (typeof responseData?.code === "string" && responseData.code.trim()) {
-    return responseData.code;
-  }
+  if (typeof responseData?.message === "string" && responseData.message.trim()) return responseData.message;
+  if (typeof responseData?.code === "string" && responseData.code.trim()) return responseData.code;
   if (error?.code === "ECONNABORTED") return "요청 시간이 초과되었어요. 잠시 후 다시 시도해 주세요.";
   if (!error?.response && error?.request) return "서버에 연결할 수 없어요. API 주소와 서버 상태를 확인해 주세요.";
   return fallback;
