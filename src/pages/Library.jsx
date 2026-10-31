@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getPlaylists } from '../api/playlists';
+import { getMemberId } from '../api/client';
 import { useNavigate } from 'react-router-dom';
 import {
   Heart,
@@ -28,8 +29,7 @@ const filters = [
 
 function Library() {
   const navigate = useNavigate();
-  const rawMemberId = import.meta.env.VITE_TEST_MEMBER_ID;
-  const memberId = rawMemberId ? Number(rawMemberId) : undefined;
+  const memberId = getMemberId();
   const {
     data: playlistResponse,
     isError: isPlaylistQueryError,
