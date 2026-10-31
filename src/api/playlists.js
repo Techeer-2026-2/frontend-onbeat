@@ -31,6 +31,13 @@ export const deleteTrackFromPlaylist = async (playlistId, trackId, memberId) => 
   });
 };
 
+export const updatePlaylistTrackOrder = async (playlistId, memberId, trackIds) => {
+  const response = await apiClient.patch(`/playlists/${playlistId}/tracks/order`, { trackIds }, {
+    params: memberParams(memberId),
+  });
+  return response.data;
+};
+
 // 플레이리스트 삭제 (성공 시 204 No Content)
 export const deletePlaylist = async (playlistId, memberId) => {
   return apiClient.delete(`/playlists/${playlistId}`, {

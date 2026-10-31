@@ -6,7 +6,7 @@ import {
   Share2, Shuffle, Music2, Trash2,
 } from 'lucide-react';
 
-import { deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail, updatePlaylist } from '../api/playlists';
+import { deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail, updatePlaylist, updatePlaylistTrackOrder } from '../api/playlists';
 import { getApiErrorMessage } from '../api/client';
 import { createPlaylistShare } from '../api/playlistShares';
 import { playlistTracks as MASTER_TRACKS, recommendedTracks } from '../mocks/tracks';
@@ -39,6 +39,7 @@ function PlaylistDetail() {
   const [deletingTrackId, setDeletingTrackId] = useState(null);
   const [isDeletingPlaylist, setIsDeletingPlaylist] = useState(false);
   const [isUpdatingPlaylist, setIsUpdatingPlaylist] = useState(false);
+  const [isOrderingTracks, setIsOrderingTracks] = useState(false);
   const [notice, setNotice] = useState('');
   const [isSharing, setIsSharing] = useState(false);
 
@@ -169,6 +170,20 @@ function PlaylistDetail() {
     }
   };
 
+  const handleToggleTrackOrder = async () => {
+    if (isOrderingTracks || tracks.length < 2) return;
+    setIsOrderingTracks(true);
+    try {
+      await updatePlaylistTrackOrder(playlistId, memberId, tracks.map((track) => track.trackId ?? track.id).reverse());
+      await queryClient.invalidateQueries({ queryKey: ['playlist', playlistId, memberId] });
+      setNotice('곡 순서를 변경했습니다.');
+    } catch (error) {
+      setNotice(getApiErrorMessage(error, '곡 순서를 변경하지 못했어요.'));
+    } finally {
+      setIsOrderingTracks(false);
+    }
+  };
+
   return (
     <div className="relative min-h-full bg-spotify-black px-4 pb-8 pt-2 text-white">
       <div className="mb-3 flex items-center justify-between">
@@ -207,7 +222,7 @@ function PlaylistDetail() {
       <div className="mb-5 grid grid-cols-4 gap-2">
         <button type="button" onClick={() => navigate('/search')} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10"><Plus size={16} />추가</button>
         <button type="button" onClick={handleUpdatePlaylist} disabled={isUpdatingPlaylist} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10 disabled:opacity-50"><ListMusic size={16} />{isUpdatingPlaylist ? '저장 중' : '수정'}</button>
-        <button type="button" className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10"><Check size={16} />정렬</button>
+        <button type="button" onClick={handleToggleTrackOrder} disabled={isOrderingTracks || tracks.length < 2} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10 disabled:opacity-50"><Check size={16} />{isOrderingTracks ? '저장 중' : '정렬'}</button>
         <button type="button" onClick={() => window.alert(`플레이리스트 이름: ${title}`)} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[10px] font-bold hover:bg-white/10"><MoreHorizontal size={16} />정보</button>
       </div>
 
