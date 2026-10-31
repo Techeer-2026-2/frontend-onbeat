@@ -1,8 +1,16 @@
-import apiClient from "./client";
+import apiClient, { memberParams } from "./client";
 
 // 사용자 직접 플레이리스트 생성
 export const generateCustomPlaylist = async (payload) => {
   const response = await apiClient.post("/playlists", payload);
+  return response.data;
+};
+
+// 플레이리스트 정보 수정
+export const updatePlaylist = async (playlistId, memberId, payload) => {
+  const response = await apiClient.patch(`/playlists/${playlistId}`, payload, {
+    params: memberParams(memberId),
+  });
   return response.data;
 };
 

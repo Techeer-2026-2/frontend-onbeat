@@ -5,7 +5,9 @@ import {
   ArrowLeft, Check, Globe, ListMusic, MoreHorizontal, Play, Plus,
   Share2, Shuffle, Music2, Trash2,
 } from 'lucide-react';
-import { deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail } from '../api/playlists';
+
+import { deletePlaylist as requestDeletePlaylist, deleteTrackFromPlaylist, getPlaylistDetail, updatePlaylist } from '../api/playlists';
+import { getApiErrorMessage } from '../api/client';
 import { playlistTracks as MASTER_TRACKS, recommendedTracks } from '../mocks/tracks';
 
 
@@ -35,6 +37,7 @@ function PlaylistDetail() {
   const memberId = Number(import.meta.env.VITE_TEST_MEMBER_ID);
   const [deletingTrackId, setDeletingTrackId] = useState(null);
   const [isDeletingPlaylist, setIsDeletingPlaylist] = useState(false);
+  const [isUpdatingPlaylist, setIsUpdatingPlaylist] = useState(false);
   const [notice, setNotice] = useState('');
 
   const { data, isLoading, isError } = useQuery({
@@ -109,6 +112,40 @@ function PlaylistDetail() {
     }
   };
 
+  const handleUpdatePlaylist = async () => {
+    if (!Number.isSafeInteger(memberId) || memberId <= 0) {
+      setNotice('.env.local에 유효한 VITE_TEST_MEMBER_ID를 설정해 주세요.');
+      return;
+    }
+    if (isUpdatingPlaylist) return;
+
+    const name = window.prompt('플레이리스트 이름을 입력하세요:', title);
+    if (name === null) return;
+    if (!name.trim()) {
+      setNotice('플레이리스트 이름을 입력해 주세요.');
+      return;
+    }
+
+    setIsUpdatingPlaylist(true);
+    try {
+      await updatePlaylist(playlistId, memberId, {
+        name: name.trim(),
+        description: playlist.description ?? '',
+        isPublic: typeof playlist.isPublic === 'boolean' ? playlist.isPublic : true,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['playlist', playlistId, memberId] }),
+        queryClient.invalidateQueries({ queryKey: ['playlists'] }),
+      ]);
+      setNotice('플레이리스트 정보를 수정했습니다.');
+    } catch (error) {
+      console.error('Playlist update failed:', error);
+      setNotice(getApiErrorMessage(error, '플레이리스트 수정에 실패했어요.'));
+    } finally {
+      setIsUpdatingPlaylist(false);
+    }
+  };
+
   return (
     <div className="relative min-h-full bg-spotify-black px-4 pb-8 pt-2 text-white">
       <div className="mb-3 flex items-center justify-between">
@@ -146,7 +183,7 @@ function PlaylistDetail() {
 
       <div className="mb-5 grid grid-cols-4 gap-2">
         <button type="button" onClick={() => navigate('/search')} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10"><Plus size={16} />추가</button>
-        <button type="button" onClick={() => navigate('/playlist/create')} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10"><ListMusic size={16} />수정</button>
+        <button type="button" onClick={handleUpdatePlaylist} disabled={isUpdatingPlaylist} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10 disabled:opacity-50"><ListMusic size={16} />{isUpdatingPlaylist ? '저장 중' : '수정'}</button>
         <button type="button" className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[11px] font-bold hover:bg-white/10"><Check size={16} />정렬</button>
         <button type="button" onClick={() => window.alert(`플레이리스트 이름: ${title}`)} className="flex min-w-0 items-center justify-center gap-1 rounded-full bg-spotify-card px-1.5 py-2.5 text-[10px] font-bold hover:bg-white/10"><MoreHorizontal size={16} />정보</button>
       </div>
