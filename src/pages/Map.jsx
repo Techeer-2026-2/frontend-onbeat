@@ -82,7 +82,7 @@ function Map() {
       return estimateRoute({
       ...originCoordinates,
       ...destinationCoordinates,
-      transportMode: transitMode.toUpperCase(),
+      transportMode: { subway: 'PUBLIC_TRANSIT', bus: 'PUBLIC_TRANSIT', walk: 'WALK', car: 'CAR' }[transitMode],
       });
     }).then((result) => {
       if (!cancelled) setDuration(Number(result?.durationMinutes ?? result?.duration ?? 0) || null);
