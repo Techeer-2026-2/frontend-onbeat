@@ -6,6 +6,7 @@ import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
 import { getMusicRankings, normalizeRankingTrack } from '../api/rankings';
 import { getAdBanners, normalizeAdBanner, recordAdClick } from '../api/ads';
+import { getMemberId } from '../api/client';
 import {
   Disc3,
   MapPin,
@@ -18,10 +19,10 @@ import {
 
 function Home() {
   const [showAllTracks, setShowAllTracks] = useState(false);
-  const [rankingScope, setRankingScope] = useState('NEARBY');
+  const [rankingScope, setRankingScope] = useState('GLOBAL');
   const { data: adBanners = [], isLoading: isAdLoading } = useQuery({
     queryKey: ['ad-banners'],
-    queryFn: getAdBanners,
+    queryFn: () => getAdBanners(getMemberId()),
     select: (items) => items.map(normalizeAdBanner),
   });
   const [location, setLocation] = useState(null);
@@ -59,19 +60,11 @@ function Home() {
   });
 
   const visibleTracks = showAllTracks ? rankingItems : rankingItems.slice(0, 5);
-  const adBanner = adBanners[0] ?? {
-    id: 'fallback-banner',
-    title: 'KILL THIS LOVE',
-    subtitle: 'BLACKPINK · 2nd MINI ALBUM',
-    image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800',
-    badge: 'COMEBACK SINGLE',
-    label: 'RELEASE',
-    targetUrl: '',
-  };
+  const adBanner = adBanners[0] ?? null;
   const handleAdClick = async () => {
     if (!adBanner) return;
     try {
-      await recordAdClick(adBanner.id);
+      if (adBanner.notificationId) await recordAdClick(adBanner.notificationId);
     } catch (error) {
       console.error('Ad click event failed:', error);
     }

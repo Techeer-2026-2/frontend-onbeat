@@ -1,14 +1,13 @@
-import apiClient from './client';
+import apiClient, { getMemberId } from './client';
 
-export const getAdBanners = async () => {
-  const path = import.meta.env.VITE_AD_BANNERS_PATH?.trim();
-  if (!path) return [];
-  const response = await apiClient.get(path);
+export const getAdBanners = async (targetUserId = getMemberId()) => {
+  const response = await apiClient.get('/banners/match', { params: { targetUserId } });
   const data = response.data;
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.banners)) return data.banners;
-  return [];
+  if (data?.data && typeof data.data === 'object') return [data.data];
+  return data && typeof data === 'object' ? [data] : [];
 };
 
 export const recordAdClick = async (bannerId) => {
@@ -17,9 +16,10 @@ export const recordAdClick = async (bannerId) => {
 };
 
 export const normalizeAdBanner = (banner, index = 0) => ({
-  id: banner.id ?? banner.bannerId ?? `banner-${index}`,
+  id: banner.campaignId ?? banner.id ?? banner.bannerId ?? `banner-${index}`,
+  notificationId: banner.notificationId ?? '',
   title: banner.title ?? banner.name ?? '추천 프로모션',
-  subtitle: banner.subtitle ?? banner.description ?? '',
+  subtitle: banner.body ?? banner.subtitle ?? banner.description ?? '',
   image: banner.imageUrl ?? banner.image ?? banner.bannerImageUrl ?? '',
   badge: banner.badge ?? 'SPONSORED',
   label: banner.label ?? 'RELEASE',

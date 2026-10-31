@@ -6,7 +6,6 @@ import { generateRecommendedPlaylist } from '../api/playlists';
 import { createCommuteProfile, getCommuteProfiles } from '../api/commuteProfiles';
 import { estimateRoute } from '../api/routes';
 import { getApiErrorMessage, getMemberId } from '../api/client';
-import { playlistTracks as TRACKS } from '../mocks/tracks';
 import { ArrowLeft, CheckCircle2, Clock3, MapPin, Plus, Route, Search, Sparkles, Train, Bus, Footprints, Car, Music2, Trash2, X } from 'lucide-react';
 
 const modes = [{ label: '지하철', Icon: Train }, { label: '버스', Icon: Bus }, { label: '도보', Icon: Footprints }, { label: '자차', Icon: Car }];

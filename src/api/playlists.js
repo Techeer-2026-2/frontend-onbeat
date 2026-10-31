@@ -32,7 +32,7 @@ export const deleteTrackFromPlaylist = async (playlistId, trackId, memberId) => 
 };
 
 export const updatePlaylistTrackOrder = async (playlistId, memberId, trackIds) => {
-  const response = await apiClient.patch(`/playlists/${playlistId}/tracks/order`, { trackIds }, {
+  const response = await apiClient.put(`/playlists/${playlistId}/tracks/order`, { playlistTrackIds: trackIds }, {
     params: memberParams(memberId),
   });
   return response.data;

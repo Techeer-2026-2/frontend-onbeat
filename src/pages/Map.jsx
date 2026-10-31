@@ -22,7 +22,6 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
-import { mapStations as stations } from '../mocks/content';
 
 const transitModes = [
   { id: 'subway', label: '지하철', icon: TrainFront },
@@ -31,58 +30,6 @@ const transitModes = [
   { id: 'car', label: '자동차', icon: CarFront },
 ];
 
-/**
- * 경로 좌표를 SVG의 0~100 좌표계로 정규화합니다.
- * - 목업의 x/y 좌표와 API의 longitude/latitude 좌표를 모두 처리합니다.
- * - padding 값으로 경로 주변 여백을 한 번에 조절합니다.
- * - 역 마커와 SVG 노선이 같은 결과 좌표를 사용하도록 합니다.
- * 실제 지도 SDK를 도입하면 SDK의 좌표 변환 결과를 사용해야 합니다.
- */
-function normalizeRouteCoordinates(
-  points,
-  padding = { x: 18, y: 20 }
-) {
-  if (!points?.length) return [];
-
-  const coordinates = points.map((point) => ({
-    ...point,
-    sourceX: Number(point.x ?? point.longitude),
-    sourceY: Number(point.y ?? point.latitude),
-  }));
-
-  if (
-    coordinates.some(
-      ({ sourceX, sourceY }) =>
-        !Number.isFinite(sourceX) || !Number.isFinite(sourceY)
-    )
-  ) {
-    return [];
-  }
-
-  const xValues = coordinates.map((point) => point.sourceX);
-  const yValues = coordinates.map((point) => point.sourceY);
-  const minX = Math.min(...xValues);
-  const maxX = Math.max(...xValues);
-  const minY = Math.min(...yValues);
-  const maxY = Math.max(...yValues);
-
-  // 가로와 세로의 여백을 따로 설정해 역 표시 구역 안쪽에 공간을 둡니다.
-  const usableWidth = 100 - padding.x * 2;
-  const usableHeight = 100 - padding.y * 2;
-
-  // 한 축의 좌표가 모두 같을 때 0으로 나누는 문제를 방지합니다.
-  const rangeX = maxX - minX || 1;
-  const rangeY = maxY - minY || 1;
-
-  return coordinates.map((point) => ({
-    ...point,
-    x: padding.x + ((point.sourceX - minX) / rangeX) * usableWidth,
-    y: padding.y + ((point.sourceY - minY) / rangeY) * usableHeight,
-  }));
-}
-
-// 노선 주변 여백. 값이 커질수록 역들이 표시 구역 중앙으로 모입니다.
-const ROUTE_PADDING = { x: 18, y: 22 };
 const stationCoordinates = {
   강남역: { startLatitude: 37.4979, startLongitude: 127.0276 },
   판교역: { endLatitude: 37.3947, endLongitude: 127.1112 },
@@ -102,16 +49,19 @@ function Map() {
   const [sessionError, setSessionError] = useState('');
   const [isSessionPending, setIsSessionPending] = useState(false);
   const memberId = getMemberId();
+  const [commuteProfileId] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('onbeat-commute-profile') || '{}').commuteProfileId ?? null;
+    } catch {
+      return null;
+    }
+  });
 
   const selectedMode = transitModes.find(
     (mode) => mode.id === transitMode
   ) ?? transitModes[0];
 
   const TransitIcon = selectedMode.icon;
-  const normalizedStations = normalizeRouteCoordinates(stations, ROUTE_PADDING);
-  const routeLinePoints = normalizedStations
-    .map((station) => `${station.x},${station.y}`)
-    .join(' ');
 
   useEffect(() => {
     if (!isRouteConfigured) return undefined;
@@ -164,10 +114,11 @@ function Map() {
     setSessionError('');
     try {
       if (!isCommuting) {
+        if (!Number.isSafeInteger(Number(commuteProfileId)) || Number(commuteProfileId) <= 0) {
+          throw new Error('통근 세션을 시작하려면 저장된 통근 프로필이 필요합니다. 통근 맞춤 플레이리스트에서 경로를 먼저 저장해 주세요.');
+        }
         const response = await startCommuteSession(memberId, {
-          origin,
-          destination,
-          transportMode: transitMode.toUpperCase(),
+          commuteProfileId: Number(commuteProfileId),
         });
         const session = response?.data ?? response?.session ?? response;
         setCommuteSession(session);
@@ -326,24 +277,8 @@ function Map() {
             </div>
 
             {/* 2. 노선 표시 영역: 높이를 줄이고 내부 여백을 확보 */}
-            <div className="relative h-44 w-full">
-              {/* SVG와 역 마커를 같은 안쪽 영역에 배치해 좌표를 일치시킵니다. */}
-              <svg
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-                className="absolute inset-4 h-[calc(100%-2rem)] w-[calc(100%-2rem)]"
-                aria-label={`${origin}에서 ${destination}까지의 통근 경로`}
-              >
-                <polyline
-                  points={routeLinePoints}
-                  fill="none"
-                  stroke="#1DB954"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray="2 2"
-                />
-              </svg>
+            <div className="relative flex h-44 w-full items-center justify-center px-6 text-center text-xs text-spotify-subtext">
+              경로 선형 지도 데이터는 현재 API 명세에 제공되지 않습니다.
             </div>
 
             {/* 3. 예상 소요 시간 카드 */}
