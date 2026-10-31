@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { addTracksToPlaylist, generateCustomPlaylist } from '../api/playlists';
 import { getApiErrorMessage, getMemberId } from '../api/client';
-import { playlistTracks as MASTER_TRACKS } from '../mocks/tracks';
+import { normalizeMusicTrack, searchMusic } from '../api/music';
 import {
   ArrowLeft, Check, Globe, ListMusic, Plus, Search,
   Music2, X, Trash2,
@@ -19,30 +19,44 @@ function PlaylistCreate() {
   const [title, setTitle] = useState('내 플레이리스트');
   const [tracks, setTracks] = useState([]);
   const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchRequestIdRef = useRef(0);
   const [showAdd, setShowAdd] = useState(false);
   const [notice, setNotice] = useState('');
   const [cover, setCover] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [createdPlaylist, setCreatedPlaylist] = useState(null);
   const totalSec = tracks.reduce((sum, t) => sum + t.durationSec, 0);
-  const available = useMemo(() => MASTER_TRACKS.filter(t => !tracks.some(added => added.id === t.id)).slice(0, 5), [tracks]);
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return MASTER_TRACKS.filter(t => !q || `${t.title} ${t.artist}`.toLowerCase().includes(q));
-  }, [query]);
+  const results = searchResults.map((track, index) => {
+    const normalized = normalizeMusicTrack(track, index);
+    return { ...normalized, art: normalized.image, durationSec: Math.round(normalized.trackTimeMillis / 1000) };
+  });
+  const handleMusicSearch = async (value) => {
+    setQuery(value);
+    const requestId = ++searchRequestIdRef.current;
+    if (value.trim().length < 2) { setSearchResults([]); return; }
+    setIsSearching(true);
+    try {
+      const response = await searchMusic(value);
+      if (requestId === searchRequestIdRef.current) setSearchResults(response);
+    } catch (error) {
+      if (requestId === searchRequestIdRef.current) {
+        setSearchResults([]);
+        setNotice(getApiErrorMessage(error, '음악 검색에 실패했어요.'));
+      }
+    } finally {
+      if (requestId === searchRequestIdRef.current) setIsSearching(false);
+    }
+  };
 
   const addTrack = (track) => {
-    if (tracks.some(t => t.id === track.id)) {
-      setNotice('이미 플레이리스트에 담긴 곡입니다.');
-      return;
-    }
+    if (tracks.some(t => t.id === track.id)) return;
     setTracks(current => [...current, track]);
     if (!cover) setCover(track.art);
-    setNotice(`'${track.title}' 곡이 추가되었습니다.`);
   };
   const removeTrack = (id) => {
     setTracks(current => current.filter(t => t.id !== id));
-    setNotice('곡이 플레이리스트에서 삭제되었습니다.');
   };
   const rename = () => {
     const value = window.prompt('플레이리스트 이름을 입력하세요:', title);
@@ -83,10 +97,7 @@ function PlaylistCreate() {
 
       if (tracks.length) {
         const dtoTracks = tracks.map((track) => {
-          // Test-only mapping for the local MASTER_TRACKS mock data. These IDs are
-          // synthetic and must be replaced when real iTunes search data is wired in.
-          const mockId = /^tr-(\d+)$/.exec(String(track.id))?.[1];
-          const itunesTrackId = Number(track.itunesTrackId ?? (mockId ? `900000000000000${mockId}` : NaN));
+          const itunesTrackId = Number(track.itunesTrackId);
           const durationSec = Number(track.durationSec);
           if (!Number.isSafeInteger(itunesTrackId) || itunesTrackId <= 0 || !Number.isFinite(durationSec) || durationSec <= 0) {
             throw new Error(`'${track.title}'의 테스트 곡 정보가 올바르지 않습니다.`);
@@ -95,7 +106,7 @@ function PlaylistCreate() {
             itunesTrackId,
             trackName: track.trackName ?? track.title,
             artistName: track.artistName ?? track.artist,
-            collectionName: track.collectionName ?? '테스트 앨범',
+            collectionName: track.collectionName ?? '',
             artworkUrl: track.artworkUrl ?? track.art ?? '',
             previewUrl: track.previewUrl ?? '',
             trackTimeMillis: Math.round(durationSec * 1000),
@@ -126,7 +137,6 @@ function PlaylistCreate() {
       };
       const saved = JSON.parse(localStorage.getItem('onbeat-playlists') || '[]');
       localStorage.setItem('onbeat-playlists', JSON.stringify([playlist, ...saved.filter((item) => String(item.id) !== String(playlist.id))]));
-      setNotice('플레이리스트가 저장되었습니다.');
       navigate('/library', { state: { createdPlaylist: playlist } });
     } catch (error) {
       console.error('Playlist save validation failed:', error);
@@ -163,7 +173,7 @@ function PlaylistCreate() {
       </div>
 
       <div className="mb-6 flex justify-center">
-        <button onClick={() => { setQuery(''); setShowAdd(true); }} className="flex items-center gap-2 rounded-full bg-white px-6 py-3 text-xs font-extrabold text-black shadow-xl transition hover:scale-105 active:scale-95"><Plus size={16} strokeWidth={3} /> 이 플레이리스트에 추가</button>
+        <button onClick={() => { setQuery(''); setSearchResults([]); setShowAdd(true); }} className="flex items-center gap-2 rounded-full bg-white px-6 py-3 text-xs font-extrabold text-black shadow-xl transition hover:scale-105 active:scale-95"><Plus size={16} strokeWidth={3} /> 이 플레이리스트에 추가</button>
       </div>
 
       <section className="mb-6 space-y-2">
@@ -175,7 +185,7 @@ function PlaylistCreate() {
           <div className="space-y-2 py-8 text-center">
             <Music2 size={40} className="mx-auto text-neutral-600" />
             <p className="text-xs font-bold">아직 추가된 곡이 없어요</p>
-            <p className="text-[11px] text-spotify-subtext">위의 추가 버튼이나 아래 추천 곡을 클릭해보세요.</p>
+            <p className="text-[11px] text-spotify-subtext">위의 추가 버튼으로 원하는 곡을 검색해보세요.</p>
           </div>
         ) : tracks.map((track, index) => (
           <div key={track.id} className="group flex items-center justify-between rounded-xl border border-white/5 bg-spotify-dark/60 p-2 transition hover:bg-white/10">
@@ -189,18 +199,6 @@ function PlaylistCreate() {
         ))}
       </section>
 
-      <section className="space-y-3 pt-2">
-        <h2 className="text-sm font-extrabold">추천 곡</h2>
-        {available.map(track => (
-          <div key={track.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-spotify-card/50 p-2 transition hover:bg-white/5">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <img src={track.art} alt="" className="h-11 w-11 shrink-0 rounded-md object-cover shadow" />
-              <div className="min-w-0"><p className="truncate text-xs font-bold">{track.title}</p><p className="truncate text-[11px] text-spotify-subtext">{track.artist}</p></div>
-            </div>
-            <button onClick={() => addTrack(track)} aria-label={`${track.title} 추가`} className="ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/20 transition hover:border-spotify-green hover:text-spotify-green"><Plus size={16} /></button>
-          </div>
-        ))}
-      </section>
 
       {notice && <button onClick={() => setNotice('')} role="status" className="fixed left-4 right-4 top-12 z-70 mx-auto max-w-sm rounded-xl border border-black/10 bg-spotify-green px-4 py-3 text-left text-xs font-bold text-black shadow-2xl">{notice} <span className="float-right">×</span></button>}
 
@@ -218,7 +216,7 @@ function PlaylistCreate() {
             </div>
           </div>
           <div className="flex-1 space-y-1 overflow-y-auto p-4">
-            {results.map(track => {
+            {isSearching ? <p className="py-8 text-center text-xs text-spotify-subtext">검색 중...</p> : results.length === 0 ? <p className="py-8 text-center text-xs text-spotify-subtext">곡명을 입력해 실제 음악을 검색해 주세요.</p> : results.map(track => {
               const added = tracks.some(t => t.id === track.id);
               return <div key={track.id} className="flex items-center justify-between border-b border-white/5 p-2.5">
                 <div className="flex min-w-0 items-center gap-3"><img src={track.art} alt="" className="h-12 w-12 shrink-0 rounded-md object-cover" /><div className="min-w-0"><p className="truncate text-xs font-bold">{track.title}</p><p className="mt-0.5 truncate text-[11px] text-spotify-subtext">{track.artist}</p></div></div>
@@ -227,7 +225,7 @@ function PlaylistCreate() {
             })}
           </div>
           <div className="shrink-0 border-t border-white/10 bg-spotify-dark/95 p-4 backdrop-blur-md">
-            <div className="relative"><Search size={16} className="absolute left-3.5 top-3.5 text-neutral-400" /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="무엇을 추가하시겠어요?" className="w-full rounded-xl border border-white/10 bg-spotify-card py-3 pl-10 pr-4 text-xs font-medium outline-none focus:border-spotify-green" /></div>
+            <div className="relative"><Search size={16} className="absolute left-3.5 top-3.5 text-neutral-400" /><input value={query} onChange={e => handleMusicSearch(e.target.value)} placeholder="무엇을 추가하시겠어요?" className="w-full rounded-xl border border-white/10 bg-spotify-card py-3 pl-10 pr-4 text-xs font-medium outline-none focus:border-spotify-green" /></div>
             <button onClick={() => setShowAdd(false)} className="mt-3 w-full rounded-full bg-spotify-green py-3 text-xs font-extrabold text-black">완료 · {tracks.length}곡</button>
           </div>
         </div>

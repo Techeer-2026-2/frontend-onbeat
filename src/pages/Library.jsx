@@ -18,7 +18,6 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Badge from '../components/common/Badge';
 import IconButton from '../components/common/IconButton';
-import { libraryItems } from '../mocks/content';
 
 const filters = [
   { label: '전체', value: 'all' },
@@ -82,7 +81,7 @@ function Library() {
     const localOnlyItems = savedPlaylistItems.filter(
       (item) => !serverIds.has(String(item.id))
     );
-    const allItems = [...serverPlaylistItems, ...localOnlyItems, ...libraryItems];
+    const allItems = [...serverPlaylistItems, ...localOnlyItems];
     const normalizedQuery = query.trim().toLowerCase();
 
     return allItems.filter((item) => {

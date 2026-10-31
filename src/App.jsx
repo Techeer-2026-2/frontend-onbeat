@@ -8,11 +8,15 @@ import Map from './pages/Map';
 import PlaylistCreate from './pages/PlaylistCreate';
 import PlaylistDetail from './pages/PlaylistDetail';
 import CommutePlaylistCreate from './pages/CommutePlaylistCreate';
+import Auth from './pages/Auth';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="auth" element={<Auth />} />
+        <Route path="auth/login" element={<Auth />} />
+        <Route path="auth/signup" element={<Auth />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/home" replace />} />
           <Route path="home" element={<Home />} />

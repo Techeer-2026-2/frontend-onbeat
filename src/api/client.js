@@ -3,7 +3,7 @@ import axios from "axios";
 const MEMBER_ID_ENV_KEY = "VITE_TEST_MEMBER_ID";
 
 export const getMemberId = () => {
-  const memberId = Number(import.meta.env.VITE_TEST_MEMBER_ID || "1");
+  const memberId = Number(localStorage.getItem('onbeat-member-id') || import.meta.env.VITE_TEST_MEMBER_ID || "1");
   return Number.isSafeInteger(memberId) && memberId > 0 ? memberId : null;
 };
 
@@ -33,8 +33,10 @@ const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use((config) => {
+  const memberId = getMemberId();
+  if (memberId) config.headers['X-Member-Id'] = String(memberId);
   const token = localStorage.getItem('onbeat-access-token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token && !config.headers.Authorization) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 

@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Music2, Search as SearchIcon, Play, X } from 'lucide-react';
 import { searchMusic, normalizeMusicTrack } from '../api/music';
-import { recordListeningEvent, recordPlaybackEvent } from '../api/playback';
+import { createPlaybackSession, recordPlaybackEvent } from '../api/playback';
 import { getApiErrorMessage, getMemberId } from '../api/client';
 
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import IconButton from '../components/common/IconButton';
-import { searchCategories as categories } from '../mocks/content';
 
 function useDebouncedValue(value, delay = 300) {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -28,6 +27,7 @@ function Search() {
   const [playingTrackId, setPlayingTrackId] = useState(null);
   const [playbackError, setPlaybackError] = useState('');
   const audioRef = useRef(null);
+  const playbackSessionRef = useRef(null);
   const memberId = getMemberId();
   const debouncedQuery = useDebouncedValue(query);
 
@@ -78,6 +78,20 @@ function Search() {
     if (playingTrackId === track.id && audioRef.current) {
       audioRef.current.pause();
       setPlayingTrackId(null);
+      const sessionId = playbackSessionRef.current;
+      if (sessionId) {
+        const playedRatio = audioRef.current.duration > 0
+          ? Math.min(1, Math.max(0, audioRef.current.currentTime / audioRef.current.duration))
+          : 0;
+        recordPlaybackEvent(memberId, {
+          eventId: crypto.randomUUID(),
+          sessionId,
+          eventType: 'TRACK_SKIPPED',
+          playedRatio,
+          occurredAt: new Date().toISOString(),
+        }).catch((error) => console.error('Playback skip event failed:', error));
+      }
+      playbackSessionRef.current = null;
       return;
     }
     audioRef.current?.pause();
@@ -86,20 +100,28 @@ function Search() {
     setPlayingTrackId(track.id);
     setPlaybackError('');
     try {
+      const sessionId = crypto.randomUUID();
+      await createPlaybackSession(memberId, {
+        sessionId,
+        trackId: String(track.itunesTrackId ?? track.id),
+        startedAt: new Date().toISOString(),
+      });
+      playbackSessionRef.current = sessionId;
       audio.onended = async () => {
         setPlayingTrackId(null);
         try {
-          await recordListeningEvent(memberId, {
-            trackId: track.itunesTrackId ?? track.id,
-            listenedSeconds: Math.round((track.trackTimeMillis ?? 0) / 1000),
-            completed: true,
+          await recordPlaybackEvent(memberId, {
+            eventId: crypto.randomUUID(),
+            sessionId,
+            eventType: 'TRACK_COMPLETED',
+            playedRatio: 1,
+            occurredAt: new Date().toISOString(),
           });
         } catch (error) { console.error('Listening event failed:', error); }
+        playbackSessionRef.current = null;
       };
       audio.onerror = () => setPlayingTrackId(null);
       await audio.play();
-      recordPlaybackEvent(memberId, { trackId: track.itunesTrackId ?? track.id, eventType: 'PLAY' })
-        .catch((error) => console.error('Playback event failed:', error));
     } catch (error) {
       setPlayingTrackId(null);
       setPlaybackError(getApiErrorMessage(error, '음악 재생을 시작하지 못했어요.'));
@@ -139,54 +161,6 @@ function Search() {
         </div>
       </section>
 
-      {/* 탐색 카테고리 */}
-      {!isSearching && (
-        <section>
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-extrabold text-white">
-              무엇을 찾으세요?
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {categories.map((category) => (
-              <Card
-                key={category.id}
-                padding="none"
-                hoverable
-                className={`relative h-28 overflow-hidden border-0 ${category.color}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (category.id === 'music') {
-                      setQuery('');
-                    } else {
-                      console.log('라이브 이벤트 카테고리 선택');
-                    }
-                  }}
-                  className="relative flex h-full w-full flex-col justify-between p-3 text-left"
-                >
-                  <span className="relative z-10 text-base font-extrabold text-white">
-                    {category.title}
-                  </span>
-
-                  <img
-                    src={category.image}
-                    alt=""
-                    loading="lazy"
-                    className="absolute -bottom-2 -right-3 h-20 w-20 rotate-20 rounded-md object-cover shadow-lg transition-transform duration-300 group-hover:scale-110"
-                  />
-
-                  <span className="relative z-10 text-[10px] font-medium text-white/80">
-                    {category.description}
-                  </span>
-                </button>
-              </Card>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* 검색 결과 */}
       {isSearching && (
