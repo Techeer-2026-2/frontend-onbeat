@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Music2, Search as SearchIcon, Play, X } from 'lucide-react';
 import { searchMusic, normalizeMusicTrack } from '../api/music';
 import { createPlaybackSession, recordPlaybackEvent } from '../api/playback';
+import { saveTrack } from '../api/tracks';
 import { getApiErrorMessage, getMemberId } from '../api/client';
 
 import Button from '../components/common/Button';
@@ -18,6 +19,23 @@ function useDebouncedValue(value, delay = 300) {
 
   return debouncedValue;
 }
+
+const currentLocation = () => new Promise((resolve) => {
+  if (!navigator.geolocation) {
+    resolve(null);
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    ({ coords, timestamp }) => resolve({
+      lat: coords.latitude,
+      lng: coords.longitude,
+      accuracyMeters: coords.accuracy,
+      recordedAt: new Date(timestamp).toISOString(),
+    }),
+    () => resolve(null),
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 },
+  );
+});
 
 function Search() {
   const [query, setQuery] = useState('');
@@ -75,13 +93,14 @@ function Search() {
       setPlaybackError('이 곡은 미리듣기를 제공하지 않아요.');
       return;
     }
-    if (playingTrackId === track.id && audioRef.current) {
-      audioRef.current.pause();
-      setPlayingTrackId(null);
+    if (audioRef.current) {
+      const previousAudio = audioRef.current;
+      previousAudio.onended = null;
+      previousAudio.pause();
       const sessionId = playbackSessionRef.current;
       if (sessionId) {
-        const playedRatio = audioRef.current.duration > 0
-          ? Math.min(1, Math.max(0, audioRef.current.currentTime / audioRef.current.duration))
+        const playedRatio = previousAudio.duration > 0
+          ? Math.min(1, Math.max(0, previousAudio.currentTime / previousAudio.duration))
           : 0;
         recordPlaybackEvent(memberId, {
           eventId: crypto.randomUUID(),
@@ -92,35 +111,56 @@ function Search() {
         }).catch((error) => console.error('Playback skip event failed:', error));
       }
       playbackSessionRef.current = null;
-      return;
+      audioRef.current = null;
+      if (playingTrackId === track.id) {
+        setPlayingTrackId(null);
+        return;
+      }
     }
-    audioRef.current?.pause();
-    const audio = new Audio(track.previewUrl);
-    audioRef.current = audio;
-    setPlayingTrackId(track.id);
     setPlaybackError('');
     try {
+      const trackId = String(track.itunesTrackId ?? '');
+      if (!/^\d+$/.test(trackId)) {
+        throw new Error('iTunes 곡 ID가 없습니다.');
+      }
+      await saveTrack(trackId, memberId, {
+        title: track.title,
+        artistName: track.artist,
+        previewUrl: track.previewUrl,
+        externalUrl: null,
+      });
+      // 위치 권한을 거부해도 재생은 계속된다. 서버는 위치가 없으면 전체 차트로 분류한다.
+      const location = await currentLocation();
       const sessionId = crypto.randomUUID();
       await createPlaybackSession(memberId, {
         sessionId,
-        trackId: String(track.itunesTrackId ?? track.id),
+        trackId,
         startedAt: new Date().toISOString(),
+        ...(location ? { location } : {}),
       });
       playbackSessionRef.current = sessionId;
+      const audio = new Audio(track.previewUrl);
+      audioRef.current = audio;
+      setPlayingTrackId(track.id);
       audio.onended = async () => {
         setPlayingTrackId(null);
         try {
           await recordPlaybackEvent(memberId, {
             eventId: crypto.randomUUID(),
             sessionId,
-            eventType: 'TRACK_COMPLETED',
+            // iTunes 미리듣기 종료는 전체 곡 완주가 아니다.
+            eventType: 'TRACK_SKIPPED',
             playedRatio: 1,
             occurredAt: new Date().toISOString(),
           });
         } catch (error) { console.error('Listening event failed:', error); }
         playbackSessionRef.current = null;
+        audioRef.current = null;
       };
-      audio.onerror = () => setPlayingTrackId(null);
+      audio.onerror = () => {
+        setPlayingTrackId(null);
+        audioRef.current = null;
+      };
       await audio.play();
     } catch (error) {
       setPlayingTrackId(null);
