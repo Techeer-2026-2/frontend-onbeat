@@ -1,17 +1,29 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Header from './Header';
 import BottomNavigation from './BottomNavigation';
 
 function Layout() {
+  const { pathname } = useLocation();
+  const isHome = pathname === '/home';
   return (
-    <div className="relative mx-auto min-h-dvh w-full max-w-md border-x border-white/10 bg-spotify-black text-white">
-      <Header />
+    <div className="desktop-stage">
+      <div className="desktop-frame">
+        <div className="desktop-titlebar" aria-hidden="true">
+          <span className="desktop-titlebar-icon">♫</span>
+          <span>ONBEAT Media OS</span>
+          <img className="aero-controls-image" src="/assets/controls.png" alt="" aria-hidden="true" />
+        </div>
 
-      <main className="min-h-[calc(100dvh-80px)] pb-20">
-        <Outlet />
-      </main>
+        <div className={`desktop-app relative text-white ${isHome ? 'aero-app-shell' : 'border-x border-white/10 bg-spotify-black'}`}>
+          <Header />
 
-      <BottomNavigation />
+          <main className="min-h-[calc(100dvh-80px)] pb-20">
+            <Outlet />
+          </main>
+
+          <BottomNavigation />
+        </div>
+      </div>
     </div>
   );
 }

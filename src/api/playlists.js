@@ -1,4 +1,6 @@
 import apiClient, { memberParams } from "./client";
+import { withMockFallback } from './mockFallback';
+import { mockPlaylistDetails, mockPlaylists } from '../mocks';
 
 // 사용자 직접 플레이리스트 생성 (memberId는 필수 query 파라미터)
 export const generateCustomPlaylist = async (memberId, payload) => {
@@ -55,16 +57,25 @@ export const generateRecommendedPlaylist = async (memberId, payload) => {
 
 // 내 플레이리스트 목록 조회
 export const getPlaylists = async (memberId) => {
-  const response = await apiClient.get("/playlists", {
-    params: memberParams(memberId),
-  });
-  return response.data;
+  return withMockFallback(
+    async () => (await apiClient.get("/playlists", { params: memberParams(memberId) })).data,
+    mockPlaylists,
+    (data) => {
+      const playlists = Array.isArray(data) ? data : data?.data;
+      return !Array.isArray(playlists) || playlists.length === 0;
+    },
+  );
 };
 
 // 플레이리스트 상세 조회
 export const getPlaylistDetail = async (playlistId, memberId) => {
-  const response = await apiClient.get(`/playlists/${playlistId}`, {
-    params: memberParams(memberId),
-  });
-  return response.data;
+  const mockPlaylist = mockPlaylistDetails[String(playlistId)] ?? mockPlaylistDetails['mock-playlist-1'];
+  return withMockFallback(
+    async () => (await apiClient.get(`/playlists/${playlistId}`, { params: memberParams(memberId) })).data,
+    mockPlaylist,
+    (data) => {
+      const playlist = data?.data ?? data?.playlist ?? data;
+      return !playlist || (playlist.id == null && !Array.isArray(playlist.tracks));
+    },
+  );
 };

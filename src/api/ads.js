@@ -1,13 +1,20 @@
 import apiClient, { getMemberId } from './client';
+import { withMockFallback } from './mockFallback';
+import { mockAdBanners } from '../mocks';
 
 export const getAdBanners = async (targetUserId = getMemberId()) => {
-  const response = await apiClient.get('/banners/match', { params: { targetUserId } });
-  const data = response.data;
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.banners)) return data.banners;
-  if (data?.data && typeof data.data === 'object') return [data.data];
-  return data && typeof data === 'object' ? [data] : [];
+  const unwrapBanners = (data) => {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.banners)) return data.banners;
+    if (data?.data && typeof data.data === 'object') return [data.data];
+    return data && typeof data === 'object' ? [data] : [];
+  };
+  return withMockFallback(
+    async () => unwrapBanners((await apiClient.get('/banners/match', { params: { targetUserId } })).data),
+    mockAdBanners,
+    (banners) => banners.length === 0,
+  );
 };
 
 export const recordAdClick = async (bannerId) => {

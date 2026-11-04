@@ -1,4 +1,6 @@
 import apiClient from './client';
+import { withMockFallback } from './mockFallback';
+import { findMockSongs } from '../mocks';
 
 const unwrapMusicResponse = (data) => {
   if (Array.isArray(data)) return data;
@@ -12,11 +14,11 @@ export const searchMusic = async (term) => {
   const normalizedTerm = String(term ?? '').trim();
   if (!normalizedTerm) return [];
 
-  const response = await apiClient.get('/music/search', {
-    params: { term: normalizedTerm },
-  });
-
-  return unwrapMusicResponse(response.data);
+  // An empty search result is meaningful, so only request failures use mocks.
+  return withMockFallback(
+    async () => unwrapMusicResponse((await apiClient.get('/music/search', { params: { term: normalizedTerm } })).data),
+    () => findMockSongs(normalizedTerm),
+  );
 };
 
 // iTunes 응답을 화면/플레이리스트 요청에서 공통으로 사용할 곡 모델로 변환한다.

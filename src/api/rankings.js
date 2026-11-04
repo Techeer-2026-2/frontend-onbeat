@@ -1,12 +1,20 @@
 import apiClient from './client';
+import { withMockFallback } from './mockFallback';
+import { mockGlobalRankings, mockNearbyRankings } from '../mocks';
 
 export const getMusicRankings = async ({ scope = 'NEARBY', limit = 50, lat, lng } = {}) => {
   const path = scope === 'GLOBAL' ? '/rankings/tracks/global' : '/rankings/tracks/nearby';
-  const response = await apiClient.get(path, { params: scope === 'GLOBAL' ? { limit } : { lat, lng, limit } });
-  const data = response.data;
-  const payload = data?.data ?? data;
-  const items = Array.isArray(payload) ? payload : payload?.items ?? payload?.rankings ?? [];
-  return { items, locationLabel: payload?.locationLabel ?? '' };
+  const toRankingResult = (data) => {
+    const payload = data?.data ?? data;
+    const items = Array.isArray(payload) ? payload : payload?.items ?? payload?.rankings ?? [];
+    return { items, locationLabel: payload?.locationLabel ?? '' };
+  };
+  const mockItems = scope === 'GLOBAL' ? mockGlobalRankings : mockNearbyRankings;
+  return withMockFallback(
+    async () => toRankingResult((await apiClient.get(path, { params: scope === 'GLOBAL' ? { limit } : { lat, lng, limit } })).data),
+    () => ({ items: mockItems.slice(0, limit), locationLabel: scope === 'NEARBY' ? '강남역' : '전체' }),
+    (result) => result.items.length === 0,
+  );
 };
 
 export const normalizeRankingTrack = (track, index) => ({

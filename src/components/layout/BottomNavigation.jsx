@@ -35,69 +35,30 @@ const navItems = [
 
 function BottomNavigation() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-
   return (
     <>
       <nav
         aria-label="주요 메뉴"
-        className="
-        fixed bottom-0 left-1/2 z-40
-        w-full max-w-md -translate-x-1/2
-        border-t border-white/10
-        bg-spotify-black/95 px-1 pb-safe
-        backdrop-blur-xl
-      "
+        className={`
+        app-navigation aero-dock aero-navigation z-40
+      `}
       >
-        <div className="mx-auto flex h-16 max-w-md items-center justify-around">
-          {navItems.map(({ to, label, Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              aria-label={label}
-              className={({ isActive }) => `
-                flex h-full min-w-0 flex-1
-                flex-col items-center justify-center gap-1
-                transition-colors
-                ${
-                  isActive
-                    ? 'text-white'
-                    : 'text-spotify-subtext hover:text-white'
-                }
-              `}
-            >
-              {({ isActive }) => (
-                <>
-                  <Icon
-                    size={22}
-                    strokeWidth={isActive ? 2.5 : 1.8}
-                    aria-hidden="true"
-                  />
-                  <span className="truncate text-[10px] font-medium">
-                    {label}
-                  </span>
-                </>
-              )}
-            </NavLink>
-          ))}
-
-          <button
-            type="button"
-            aria-label="만들기 메뉴 열기"
-            aria-haspopup="dialog"
-            onClick={() => setIsCreateOpen(true)}
-            className="
-              flex h-full min-w-0 flex-1
-              flex-col items-center justify-center gap-1
-              text-spotify-subtext transition-colors
-              hover:text-white
-            "
+        {navItems.map(({ to, label, Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            aria-label={label}
+            className={({ isActive }) => `aero-nav-item ${isActive ? 'active' : ''}`}
           >
-            <Plus size={22} aria-hidden="true" />
-            <span className="text-[10px] font-medium">
-              만들기
-            </span>
-          </button>
-        </div>
+            <Icon className="aero-nav-icon" aria-hidden="true" />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+
+        <button type="button" aria-label="만들기 메뉴 열기" aria-haspopup="dialog" onClick={() => setIsCreateOpen(true)} className="aero-nav-item">
+          <Plus className="aero-nav-icon" aria-hidden="true" />
+          <span>만들기</span>
+        </button>
       </nav>
 
       {isCreateOpen && (

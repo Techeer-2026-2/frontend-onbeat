@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Music2, Search as SearchIcon, Play, X } from 'lucide-react';
+import { Music2, Search as SearchIcon, Pause, Play, X } from 'lucide-react';
 import { searchMusic, normalizeMusicTrack } from '../api/music';
 import { createPlaybackSession, recordPlaybackEvent } from '../api/playback';
 import { saveTrack } from '../api/tracks';
@@ -261,9 +261,9 @@ function Search() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handlePlayClick(track)}
-                    className="shrink-0"
+                    className={`aero-control-button shrink-0 ${playingTrackId === track.id ? 'aero-control-button--active' : 'aero-control-button--primary'}`}
                   >
-                    <Play size={16} fill="currentColor" />
+                    {playingTrackId === track.id ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
                     {playingTrackId === track.id ? '재생 중' : '재생'}
                   </Button>
                 </div>
