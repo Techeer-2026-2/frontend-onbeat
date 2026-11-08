@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Globe2, MapPin, Play, Music2 } from "lucide-react";
 import XpPanel from "../components/common/XpPanel";
 import SongRow from "../components/music/SongRow";
-import { chartTop100, chartNearby50 } from "../data/mockSongs";
+import { chartNearby50 } from "../data/mockSongs";
 import { useOnBeat } from "../context/OnBeatContext";
 
 export default function Charts() {
@@ -19,6 +19,8 @@ export default function Charts() {
       : { label: "주변 TOP 50", icon: MapPin, ids: chartNearby50 };
   const songs = config.ids.map(getSong).filter(Boolean);
   const Icon = config.icon;
+  const { data: songs = [], isLoading, isError } = useGlobalChart();
+
   return (
     <div className="page chart-page">
       <XpPanel
