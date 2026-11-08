@@ -1,294 +1,59 @@
-import { useEffect, useRef, useState } from 'react';
-import { Music2, Search as SearchIcon, Play, X } from 'lucide-react';
-import { searchMusic, normalizeMusicTrack } from '../api/music';
-import { createPlaybackSession, recordPlaybackEvent } from '../api/playback';
-import { saveTrack } from '../api/tracks';
-import { getApiErrorMessage, getMemberId } from '../api/client';
-
-import Button from '../components/common/Button';
-import Card from '../components/common/Card';
-import IconButton from '../components/common/IconButton';
-
-function useDebouncedValue(value, delay = 300) {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedValue(value), delay);
-    return () => window.clearTimeout(timer);
-  }, [value, delay]);
-
-  return debouncedValue;
-}
-
-const currentLocation = () => new Promise((resolve) => {
-  if (!navigator.geolocation) {
-    resolve(null);
-    return;
+import React,{useEffect,useState} from 'react';
+import {Search as SearchIcon,X,Sparkles,Music2,UserRound,ListMusic,Clock3,Trash2,Star,ChevronDown} from 'lucide-react';
+import XpPanel from '../components/common/XpPanel';
+import SongRow from '../components/music/SongRow';
+import {useOnBeat} from '../context/OnBeatContext';
+import AeroSelect from '../components/common/AeroSelect';
+import {searchMusic} from '../api/music';
+const types=[['전체',Sparkles],['곡',Music2],['아티스트',UserRound],['플레이리스트',ListMusic]];
+const recommended=['혼자 듣기 좋은 노래','감성 발라드','출근길 플레이리스트','여름 노래'];
+export default function Search(){
+ const {songs,playlists,recent,setRecent,addRecent,playSong}=useOnBeat();
+ const [query,setQuery]=useState(''),[type,setType]=useState('전체'),[resultType,setResultType]=useState('곡'),[sort,setSort]=useState('정확도순');
+ const [apiSongs,setApiSongs]=useState([]),[isLoading,setIsLoading]=useState(false),[error,setError]=useState('');
+ const q=query.trim().toLowerCase();
+ const matchingSongs=q?apiSongs:songs;
+ const matchingPlaylists=playlists.filter(p=>!q||`${p.name} ${p.description}`.toLowerCase().includes(q));
+ const artists=[...new Set(songs.map(s=>s.artist))].filter(a=>!q||a.toLowerCase().includes(q));
+ const submit=e=>{e?.preventDefault();addRecent(query)};
+ const pick=(word)=>{setQuery(word);addRecent(word)};
+ const showSongs=(type==='전체'||type==='곡')&&resultType==='곡';
+ useEffect(()=>{
+  if(!query.trim()){
+   setApiSongs([]);
+   setError('');
+   return;
   }
-  navigator.geolocation.getCurrentPosition(
-    ({ coords, timestamp }) => resolve({
-      lat: coords.latitude,
-      lng: coords.longitude,
-      accuracyMeters: coords.accuracy,
-      recordedAt: new Date(timestamp).toISOString(),
-    }),
-    () => resolve(null),
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 },
-  );
-});
 
-function Search() {
-  const [query, setQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [searchError, setSearchError] = useState('');
-  const [playingTrackId, setPlayingTrackId] = useState(null);
-  const [playbackError, setPlaybackError] = useState('');
-  const audioRef = useRef(null);
-  const playbackSessionRef = useRef(null);
-  const memberId = getMemberId();
-  const debouncedQuery = useDebouncedValue(query);
-
-  const normalizedQuery = query.trim();
-
-  const isSearching = normalizedQuery.length > 0;
-
-  useEffect(() => {
-    let cancelled = false;
-    const term = debouncedQuery.trim();
-
-    if (!term) {
-      return undefined;
-    }
-
-    Promise.resolve()
-      .then(() => {
-        if (cancelled) return null;
-        setIsLoading(true);
-        setSearchError('');
-        return searchMusic(term);
-      })
-      .then((tracks) => {
-        if (!tracks) return;
-        if (!cancelled) setSearchResults(tracks.map(normalizeMusicTrack));
-      })
-      .catch((error) => {
-        console.error('Music search failed:', error);
-        if (!cancelled) {
-          setSearchResults([]);
-          setSearchError('음악 검색에 실패했어요. 잠시 후 다시 시도해 주세요.');
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [debouncedQuery]);
-
-  const handlePlayClick = async (track) => {
-    if (!track.previewUrl) {
-      setPlaybackError('이 곡은 미리듣기를 제공하지 않아요.');
-      return;
-    }
-    if (audioRef.current) {
-      const previousAudio = audioRef.current;
-      previousAudio.onended = null;
-      previousAudio.pause();
-      const sessionId = playbackSessionRef.current;
-      if (sessionId) {
-        const playedRatio = previousAudio.duration > 0
-          ? Math.min(1, Math.max(0, previousAudio.currentTime / previousAudio.duration))
-          : 0;
-        recordPlaybackEvent(memberId, {
-          eventId: crypto.randomUUID(),
-          sessionId,
-          eventType: 'TRACK_SKIPPED',
-          playedRatio,
-          occurredAt: new Date().toISOString(),
-        }).catch((error) => console.error('Playback skip event failed:', error));
-      }
-      playbackSessionRef.current = null;
-      audioRef.current = null;
-      if (playingTrackId === track.id) {
-        setPlayingTrackId(null);
-        return;
-      }
-    }
-    setPlaybackError('');
-    try {
-      const trackId = String(track.itunesTrackId ?? '');
-      if (!/^\d+$/.test(trackId)) {
-        throw new Error('iTunes 곡 ID가 없습니다.');
-      }
-      await saveTrack(trackId, memberId, {
-        title: track.title,
-        artistName: track.artist,
-        previewUrl: track.previewUrl,
-        externalUrl: null,
-      });
-      // 위치 권한을 거부해도 재생은 계속된다. 서버는 위치가 없으면 전체 차트로 분류한다.
-      const location = await currentLocation();
-      const sessionId = crypto.randomUUID();
-      await createPlaybackSession(memberId, {
-        sessionId,
-        trackId,
-        startedAt: new Date().toISOString(),
-        ...(location ? { location } : {}),
-      });
-      playbackSessionRef.current = sessionId;
-      const audio = new Audio(track.previewUrl);
-      audioRef.current = audio;
-      setPlayingTrackId(track.id);
-      audio.onended = async () => {
-        setPlayingTrackId(null);
-        try {
-          await recordPlaybackEvent(memberId, {
-            eventId: crypto.randomUUID(),
-            sessionId,
-            // iTunes 미리듣기 종료는 전체 곡 완주가 아니다.
-            eventType: 'TRACK_SKIPPED',
-            playedRatio: 1,
-            occurredAt: new Date().toISOString(),
-          });
-        } catch (error) { console.error('Listening event failed:', error); }
-        playbackSessionRef.current = null;
-        audioRef.current = null;
-      };
-      audio.onerror = () => {
-        setPlayingTrackId(null);
-        audioRef.current = null;
-      };
-      await audio.play();
-    } catch (error) {
-      setPlayingTrackId(null);
-      setPlaybackError(getApiErrorMessage(error, '음악 재생을 시작하지 못했어요.'));
-    }
-  };
-
-  return (
-    <div className="space-y-5 px-4 pb-6 pt-4">
-      {/* 검색창 */}
-      <section>
-        <div className="relative">
-          <SearchIcon
-            size={20}
-            aria-hidden="true"
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-800"
-          />
-
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="어떤 것을 듣고 싶으세요?"
-            aria-label="음악 검색"
-            className="w-full rounded-lg bg-white py-3 pl-11 pr-11 text-sm font-medium text-black shadow-md outline-none placeholder:text-neutral-500 focus:ring-2 focus:ring-spotify-green"
-          />
-
-          {query && (
-            <IconButton
-              label="검색어 지우기"
-              size="sm"
-              onClick={() => setQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-700"
-            >
-              <X size={17} />
-            </IconButton>
-          )}
-        </div>
-      </section>
-
-
-      {/* 검색 결과 */}
-      {isSearching && (
-        <section>
-          {playbackError && <p role="alert" className="mb-2 text-xs text-amber-300">{playbackError}</p>}
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-extrabold text-white">
-                검색 결과
-              </h2>
-              <p className="mt-1 text-xs text-spotify-subtext">
-                '{query.trim()}' 검색 결과 {searchResults.length}곡
-              </p>
-            </div>
-
-            <IconButton
-              label="검색어 지우기"
-              size="sm"
-              onClick={() => setQuery('')}
-            >
-              <X size={17} />
-            </IconButton>
-          </div>
-
-          {isLoading ? (
-            <Card padding="lg" className="py-10 text-center">
-              <p className="text-sm font-bold text-white">음악을 검색하고 있어요...</p>
-            </Card>
-          ) : searchError ? (
-            <Card padding="lg" className="py-10 text-center">
-              <p role="alert" className="text-sm font-bold text-white">{searchError}</p>
-            </Card>
-          ) : searchResults.length > 0 ? (
-            <div className="space-y-1">
-              {searchResults.map((track) => (
-                <div
-                  key={track.id}
-                  className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-white/5"
-                >
-                  <img
-                    src={track.image}
-                    alt=""
-                    loading="lazy"
-                    className="h-12 w-12 shrink-0 rounded-md object-cover"
-                  />
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-bold text-white">
-                      {track.title}
-                    </p>
-                    <p className="mt-1 truncate text-xs text-spotify-subtext">
-                      {track.artist}
-                    </p>
-                  </div>
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handlePlayClick(track)}
-                    className="shrink-0"
-                  >
-                    <Play size={16} fill="currentColor" />
-                    {playingTrackId === track.id ? '재생 중' : '재생'}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Card padding="lg" className="py-10 text-center">
-              <Music2
-                size={36}
-                className="mx-auto mb-3 text-spotify-subtext"
-              />
-              <p className="text-sm font-bold text-white">
-                검색 결과가 없어요
-              </p>
-              <p className="mt-2 text-xs text-spotify-subtext">
-                곡 제목이나 아티스트 이름을 다시 확인해 주세요.
-              </p>
-            </Card>
-          )}
-        </section>
-      )}
-    </div>
-  );
+  let cancelled=false;
+  setIsLoading(true);
+  setError('');
+  searchMusic(query.trim())
+   .then(results=>{
+    if(cancelled)return;
+    setApiSongs((Array.isArray(results)?results:[]).map(track=>({
+     id:`itunes-${track.itunesTrackId}`,
+     title:track.trackName,
+     artist:track.artistName,
+     duration:Math.round((track.trackTimeMillis||0)/1000),
+     cover:track.artworkUrl,
+     category:track.genre,
+     previewUrl:track.previewUrl,
+    })));
+   })
+   .catch(()=>{if(!cancelled)setError('검색 결과를 불러오지 못했습니다. 백엔드 서버와 네트워크를 확인해 주세요.')})
+   .finally(()=>{if(!cancelled)setIsLoading(false)});
+  return()=>{cancelled=true};
+ },[query]);
+ return <div className="page search-page">
+ <form className="search-input-bar glossy-field" onSubmit={submit}><SearchIcon size={26}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="노래, 아티스트, 플레이리스트 검색" aria-label="음악 검색"/>{query&&<button type="button" className="clear-query" onClick={()=>setQuery('')} aria-label="검색어 지우기"><X size={20}/></button>}<button type="submit" className="search-submit" aria-label="검색"><SearchIcon size={22}/></button></form>
+ <div className="search-tabs">{types.map(([t,Icon])=><button key={t} className={type===t?'active':''} onClick={()=>{setType(t);setResultType(t==='전체'?'곡':t)}}><Icon size={19}/>{t}</button>)}</div>
+ <section className="glass-section mini-section"><div className="mini-title"><strong><Clock3 size={20}/> 최근 검색어</strong><button onClick={()=>setRecent([])}><Trash2 size={16}/> 전체삭제</button></div><div className="chips">{recent.length?recent.map(word=><button key={word} onClick={()=>pick(word)}><SearchIcon size={14}/>{word}</button>):<span className="muted">최근 검색어가 없습니다.</span>}</div></section>
+ <section className="glass-section suggested-section"><div className="mini-title"><strong><Star size={21} fill="#ffdd49" color="#d18f00"/> 추천 검색어</strong><Music2 size={19}/></div><div className="chips">{recommended.map(word=><button key={word} onClick={()=>pick(word)}><SearchIcon size={14}/>{word}</button>)}</div></section>
+ <XpPanel title={`검색 결과 ${q?`(총 ${matchingSongs.length+matchingPlaylists.length+artists.length}건)`:'(총 128건)'}`} icon={Music2} action={<AeroSelect className="aero-select--compact" value={sort} options={['정확도순','제목순']} onValueChange={setSort} ariaLabel="검색 결과 정렬"/>} className="results-panel">
+ {type==='전체'&&<div className="result-tabs">{['곡','아티스트','플레이리스트'].map(t=><button key={t} className={resultType===t?'active':''} onClick={()=>setResultType(t)}>{t==='곡'&&<Music2 size={17}/>} {t}</button>)}</div>}
+ {showSongs||type==='곡'?<div className="song-list">{isLoading&&<div className="empty-state">검색 중...</div>}{error&&<div className="empty-state">{error}</div>}{!isLoading&&!error&&(sort==='제목순'?[...matchingSongs].sort((a,b)=>a.title.localeCompare(b.title)):matchingSongs).map(song=><SongRow song={song} key={song.id}/>)}{!isLoading&&!error&&!matchingSongs.length&&<div className="empty-state">검색 결과가 없습니다.</div>}</div>:null}
+ {(type==='아티스트'||resultType==='아티스트'&&type==='전체')&&<div className="artist-list">{artists.map(artist=><button key={artist} className="artist-row" onClick={()=>pick(artist)}><UserRound size={24}/><span>{artist}</span><ChevronDown size={18}/></button>)}{artists.length===0&&<div className="empty-state">일치하는 아티스트가 없습니다.</div>}</div>}
+ {(type==='플레이리스트'||resultType==='플레이리스트'&&type==='전체')&&<div className="song-list">{matchingPlaylists.map(p=><div className="playlist-row" key={p.id}><img src={p.cover} alt=""/><div className="playlist-row-text"><strong>{p.name}</strong><span>{p.songIds.length}곡</span></div><button className="round-play" onClick={()=>playSong(p.songIds[0])} aria-label="재생">▶</button></div>)}{!matchingPlaylists.length&&<div className="empty-state">일치하는 플레이리스트가 없습니다.</div>}</div>}
+ </XpPanel></div>
 }
-
-export default Search;
-
-

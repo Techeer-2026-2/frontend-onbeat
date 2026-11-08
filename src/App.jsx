@@ -1,35 +1,29 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-
-import Layout from './components/layout/Layout';
+import React from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import AppLayout from './components/layout/AppLayout';
 import Home from './pages/Home';
 import Search from './pages/Search';
 import Library from './pages/Library';
 import Map from './pages/Map';
-import PlaylistCreate from './pages/PlaylistCreate';
-import PlaylistDetail from './pages/PlaylistDetail';
-import CommutePlaylistCreate from './pages/CommutePlaylistCreate';
-import Auth from './pages/Auth';
+import CreatePlaylist from './pages/CreatePlaylist';
+import CreateCommutePlaylist from './pages/CreateCommutePlaylist';
+import MyPage from './pages/MyPage';
+import Charts from './pages/Charts';
 
-function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="auth" element={<Auth />} />
-        <Route path="auth/login" element={<Auth />} />
-        <Route path="auth/signup" element={<Auth />} />
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/home" replace />} />
-          <Route path="home" element={<Home />} />
-          <Route path="search" element={<Search />} />
-          <Route path="library" element={<Library />} />
-          <Route path="map" element={<Map />} />
-          <Route path="playlist/create" element={<PlaylistCreate />} />
-          <Route path="playlist/:playlistId" element={<PlaylistDetail />} />
-          <Route path="playlist/commute/create" element={<CommutePlaylistCreate />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  );
+export default function App() {
+  return <Routes>
+    <Route element={<AppLayout />}>
+      <Route index element={<Home />} />
+      <Route path="/home" element={<Navigate to="/" replace />} />
+      <Route path="/search" element={<Search />} />
+      <Route path="/library" element={<Library />} />
+      <Route path="/map" element={<Map />} />
+      <Route path="/playlist/create" element={<CreatePlaylist />} />
+      <Route path="/playlist/commute/create" element={<CreateCommutePlaylist />} />
+      <Route path="/my" element={<MyPage />} />
+      <Route path="/charts/top100" element={<Charts />} />
+      <Route path="/charts/nearby50" element={<Charts />} />
+    </Route>
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>;
 }
-
-export default App;
