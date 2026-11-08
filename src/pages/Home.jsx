@@ -13,22 +13,27 @@ import {
 import XpPanel from "../components/common/XpPanel";
 import MusicPlayer from "../components/player/MusicPlayer";
 import { useOnBeat } from "../context/OnBeatContext";
-import {
-  topGlobal,
-  topNearby,
-  durationLabel,
-  totalTime,
-} from "../data/mockSongs";
-function TopList({ ids }) {
-  const { getSong, playSong } = useOnBeat();
+import { useGlobalChart, useNearbyChart } from "../hooks/useCharts";
+import { useCurrentPosition } from "../hooks/useCurrentPosition";
+import { durationLabel, totalTime } from "../data/mockSongs";
+
+const HOME_TOP_COUNT = 3; // 홈 미리보기에 보여줄 곡 수
+
+// songs: 곡 객체 배열 / errorMessage: 보여줄 에러 문장 (없으면 "")
+function TopList({ songs, isLoading = false, errorMessage = "" }) {
+  const { playSong } = useOnBeat();
+  if (isLoading) return <div className="empty-state">불러오는 중...</div>;
+  if (errorMessage) return <div className="empty-state">{errorMessage}</div>;
+  if (!songs.length) {
+    return <div className="empty-state">아직 집계된 차트가 없어요.</div>;
+  }
   return (
     <div className="top-list">
-      {(Array.isArray(ids) ? ids : []).map((id, index) => {
-        const song = getSong(id);
-        if (!song) return null;
+      {songs.map((song, index) => {
+        const id = song.id;
         return (
           <div className="top-row" key={id}>
-            <b>{index + 1}</b>
+            <b>{song.rank ?? index + 1}</b>
             <img src={song.cover} alt="" />
             <div className="top-song">
               <strong>{song.title}</strong>
@@ -58,6 +63,20 @@ export default function Home() {
   )
     .map(getSong)
     .filter(Boolean);
+
+  // 전체 인기곡: API (차트 화면과 같은 훅이라 캐시도 공유)
+  const globalChart = useGlobalChart();
+  const globalTop = (globalChart.data ?? []).slice(0, HOME_TOP_COUNT);
+
+  // 주변 인기곡: 홈에 들어오면 바로 위치를 받아서 API 요청
+  const { position, error: positionError } = useCurrentPosition(true);
+  const nearbyChart = useNearbyChart(position);
+  const nearbyTop = (nearbyChart.data ?? []).slice(0, HOME_TOP_COUNT);
+  const nearbyLoading =
+    nearbyChart.isLoading || (!position && !positionError); // 위치를 기다리는 동안도 로딩
+  const nearbyError =
+    positionError ?? (nearbyChart.isError ? "차트를 불러오지 못했어요." : "");
+
   return (
     <div className="page home-page">
       <button
@@ -105,10 +124,18 @@ export default function Home() {
       </XpPanel>
       <div className="top-panels">
         <XpPanel title="전체 인기곡 TOP 100" icon={Globe2}>
-          <TopList ids={topGlobal} />
+          <TopList
+            songs={globalTop}
+            isLoading={globalChart.isLoading}
+            errorMessage={globalChart.isError ? "차트를 불러오지 못했어요." : ""}
+          />
         </XpPanel>
         <XpPanel title="주변 인기곡 TOP 50" icon={MapPin}>
-          <TopList ids={topNearby} />
+          <TopList
+            songs={nearbyTop}
+            isLoading={nearbyLoading}
+            errorMessage={nearbyError}
+          />
         </XpPanel>
       </div>
       <MusicPlayer />
