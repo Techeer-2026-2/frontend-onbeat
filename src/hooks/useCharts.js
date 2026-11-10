@@ -9,6 +9,7 @@ const toChartSongs = (chart) =>
     rank: item.rank,
   }));
 
+// 글로벌 차트 쿼리 훅
 export function useGlobalChart() {
   return useQuery({
     queryKey: ["chart", "global"],
@@ -16,6 +17,7 @@ export function useGlobalChart() {
   });
 }
 
+// 위치 기반 차트 쿼리 훅
 export function useNearbyChart(position) {
   return useQuery({
     queryKey: ["chart", "nearby", position?.lat, position?.lng],

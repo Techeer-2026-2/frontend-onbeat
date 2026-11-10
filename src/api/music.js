@@ -1,8 +1,5 @@
-import axios from "axios";
+import client from "./client";
 
-export async function searchMusic(term) {
-  const response = await axios.get("/api/v1/music/search", {
-    params: { term },
-  });
-  return response.data;
-}
+// 검색어를 받아 해당하는 음악 데이터를 가져오는 함수
+export const searchMusic = (term) =>
+  client.get("music/search", { params: { term } });
