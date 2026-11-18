@@ -11,6 +11,7 @@ import {
   Plus,
 } from "lucide-react";
 import XpPanel from "../components/common/XpPanel";
+import AdBannerCarousel from "../components/common/AdBannerCarousel";
 import { useOnBeat } from "../context/OnBeatContext";
 import { useGlobalChart, useNearbyChart } from "../hooks/useCharts";
 import { useCurrentPosition } from "../hooks/useCurrentPosition";
@@ -105,6 +106,8 @@ export default function Home() {
           <ArrowRight size={23} />
         </b>
       </button>
+      {/* 광고 배너: 앱 프로모션 + 서버가 고른 맞춤 광고(있으면 맨 앞) */}
+      <AdBannerCarousel />
       <XpPanel
         title="오늘의 출근길 ♫"
         icon={TrainFront}
