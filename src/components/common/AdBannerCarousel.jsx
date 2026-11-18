@@ -27,11 +27,14 @@ export default function AdBannerCarousel({
       460,
     );
   };
+  // 자동 넘김: 넘어가는 중(isTransitioning)이 끝난 뒤에 다음 타이머를 건다
+  // (예전에는 넘어가는 중인 상태를 기억한 채 타이머가 실행돼서 한 번 넘긴 뒤 멈췄음)
   useEffect(() => {
+    if (isTransitioning) return undefined;
     const timer = window.setTimeout(() => changeTo(index + 1), SLIDE_DELAY);
     return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 원래 코드 동작 유지 (슬라이드 바뀔 때만 타이머 재설정)
-  }, [index, banners.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- changeTo는 매번 새로 만들어지므로 제외
+  }, [index, banners.length, isTransitioning]);
   useEffect(() => () => window.clearTimeout(unlockTimer.current), []);
   const begin = (event) => {
     startX.current = event.clientX;
@@ -52,12 +55,9 @@ export default function AdBannerCarousel({
       dragged.current = false;
       return;
     }
-    if (!banner.link) {
-      event.preventDefault();
-      return;
-    }
-    if (banner.notificationId)
-      recordBannerClick(banner.notificationId).catch(() => {});
+    if (!banner.link) event.preventDefault(); // 이동할 곳이 없으면 페이지 이동은 막음
+    // 광고는 링크가 없어도 누른 것 자체를 클릭으로 기록 (같은 notificationId는 서버가 한 번만 집계)
+    if (banner.isAd) recordBannerClick(banner.notificationId).catch(() => {});
   };
   if (!banners.length) return null;
   return (
@@ -76,17 +76,29 @@ export default function AdBannerCarousel({
         >
           {banners.map((banner) => (
             <a
-              className="ad-banner-slide"
+              className={`ad-banner-slide ${banner.isAd ? "is-ad" : ""}`}
               key={banner.id}
               href={banner.link || undefined}
-              target={banner.isAd ? "_blank" : undefined}
+              target={banner.isAd && banner.link ? "_blank" : undefined}
               rel={banner.isAd ? "noopener noreferrer sponsored" : undefined}
               onClick={(event) => clickBanner(event, banner)}
               aria-label={
-                banner.link ? banner.alt : `${banner.alt} (연결된 링크 없음)`
+                banner.isAd
+                  ? `광고: ${banner.alt}`
+                  : banner.link
+                    ? banner.alt
+                    : `${banner.alt} (연결된 링크 없음)`
               }
             >
-              <img src={banner.image} alt={banner.alt} />
+              {banner.image ? (
+                <img src={banner.image} alt={banner.alt} />
+              ) : (
+                <div className="ad-banner-text">
+                  <strong>{banner.title}</strong>
+                  {banner.body && <span>{banner.body}</span>}
+                </div>
+              )}
+              {banner.isAd && <span className="ad-banner-badge">광고</span>}
             </a>
           ))}
         </div>

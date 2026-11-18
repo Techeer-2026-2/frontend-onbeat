@@ -11,9 +11,12 @@ export function useMatchedBanner() {
       if (!banner?.notificationId) return null; // 204: 맞는 광고 없음
       return {
         id: banner.notificationId,
-        notificationId: banner.notificationId,
-        image: banner.imageUrl,
-        link: banner.linkUrl || null,
+        notificationId: banner.notificationId, // 클릭 기록에 그대로 보냄
+        campaignId: banner.campaignId,
+        image: banner.imageUrl || null, // 없으면 제목·본문으로 된 글자 배너로 표시
+        title: banner.title || "",
+        body: banner.body || "",
+        link: banner.linkUrl || null, // 없으면 배너를 누르는 것 자체가 클릭으로 집계됨
         alt: banner.title || "광고",
         isAd: true,
       };
