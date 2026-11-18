@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Minus, Square, X } from "lucide-react";
 export function WinControls({ small = false }) {
   return (
