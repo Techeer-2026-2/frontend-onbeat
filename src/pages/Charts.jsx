@@ -75,7 +75,7 @@ export default function Charts() {
             </span>
             <button
               className="chart-play-all"
-              onClick={() => playCollection(songs.map((song) => song.id))}
+              onClick={() => playCollection(songs)}
             >
               <Play size={17} fill="currentColor" /> 전체 재생
             </button>
@@ -96,7 +96,7 @@ export default function Charts() {
               rank={song.rank ?? index + 1} // 서버가 준 순위가 있으면 사용
               showDuration
               action="favorite"
-              onSongClick={() => playSong(song.id)}
+              onSongClick={() => playSong(song)}
             />
           ))}
         </div>

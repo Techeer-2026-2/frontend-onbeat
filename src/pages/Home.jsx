@@ -1,4 +1,4 @@
-import React from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -8,14 +8,16 @@ import {
   Globe2,
   MapPin,
   Play,
-  AudioLines,
+  Plus,
 } from "lucide-react";
 import XpPanel from "../components/common/XpPanel";
-import MusicPlayer from "../components/player/MusicPlayer";
 import { useOnBeat } from "../context/OnBeatContext";
 import { useGlobalChart, useNearbyChart } from "../hooks/useCharts";
 import { useCurrentPosition } from "../hooks/useCurrentPosition";
-import { durationLabel, totalTime } from "../data/mockSongs";
+import { useLoadPlaylistSongs, usePlaylists } from "../hooks/usePlaylists";
+import { useMainCommuteProfile } from "../hooks/useCommute";
+import { saveLocation } from "../api/playback";
+import { durationLabel } from "../utils/time";
 
 const HOME_TOP_COUNT = 3; // 홈 미리보기에 보여줄 곡 수
 
@@ -30,9 +32,8 @@ function TopList({ songs, isLoading = false, errorMessage = "" }) {
   return (
     <div className="top-list">
       {songs.map((song, index) => {
-        const id = song.id;
         return (
-          <div className="top-row" key={id}>
+          <div className="top-row" key={song.id}>
             <b>{song.rank ?? index + 1}</b>
             <img src={song.cover} alt="" />
             <div className="top-song">
@@ -42,7 +43,7 @@ function TopList({ songs, isLoading = false, errorMessage = "" }) {
             <button
               className="round-play"
               aria-label={`${song.title} 재생`}
-              onClick={() => playSong(id)}
+              onClick={() => playSong(song)}
             >
               <Play size={19} fill="#087fdd" />
             </button>
@@ -54,15 +55,26 @@ function TopList({ songs, isLoading = false, errorMessage = "" }) {
 }
 export default function Home() {
   const nav = useNavigate(),
-    { playlists, getSong, playSong } = useOnBeat();
-  const commutePlaylist = (Array.isArray(playlists) ? playlists : []).find(
-    (p) => p?.isCommute,
-  );
-  const songs = (
-    Array.isArray(commutePlaylist?.songIds) ? commutePlaylist.songIds : []
-  )
-    .map(getSong)
-    .filter(Boolean);
+    { playCollection, setToast } = useOnBeat();
+
+  // 오늘의 출근길: 가장 최근에 만든 통근 플레이리스트 + 대표 통근 프로필
+  const { data: playlists = [] } = usePlaylists();
+  const commutePlaylist = playlists
+    .filter((p) => p.isCommute)
+    .reduce((latest, p) => (!latest || p.id > latest.id ? p : latest), null);
+  const { profile } = useMainCommuteProfile();
+  const loadPlaylistSongs = useLoadPlaylistSongs();
+  const playCommute = async () => {
+    if (!commutePlaylist) {
+      nav("/playlist/commute/create");
+      return;
+    }
+    try {
+      playCollection(await loadPlaylistSongs(commutePlaylist.id));
+    } catch {
+      setToast("플레이리스트를 불러오지 못했어요.");
+    }
+  };
 
   // 전체 인기곡: API (차트 화면과 같은 훅이라 캐시도 공유)
   const globalChart = useGlobalChart();
@@ -72,10 +84,14 @@ export default function Home() {
   const { position, error: positionError } = useCurrentPosition(true);
   const nearbyChart = useNearbyChart(position);
   const nearbyTop = (nearbyChart.data ?? []).slice(0, HOME_TOP_COUNT);
-  const nearbyLoading =
-    nearbyChart.isLoading || (!position && !positionError); // 위치를 기다리는 동안도 로딩
+  const nearbyLoading = nearbyChart.isLoading || (!position && !positionError); // 위치를 기다리는 동안도 로딩
   const nearbyError =
     positionError ?? (nearbyChart.isError ? "차트를 불러오지 못했어요." : "");
+
+  // 위치를 받으면 서버에 최신 위치로 저장 (주변 랭킹·청취 인원 계산용)
+  useEffect(() => {
+    if (position) saveLocation(position).catch(() => {});
+  }, [position]);
 
   return (
     <div className="page home-page">
@@ -100,12 +116,18 @@ export default function Home() {
             alt="푸른 하늘과 헤드폰"
           />
           <div className="hero-playlist-info">
-            <h2>출근 맞춤 플레이리스트</h2>
-            <p>지하철 · 예상 소요시간 51분</p>
+            <h2>{commutePlaylist?.name ?? "출근 맞춤 플레이리스트"}</h2>
+            <p>
+              {profile
+                ? `${profile.transport} · 예상 소요시간 ${profile.averageMinutes ?? "-"}분`
+                : "통근 경로를 등록해 주세요"}
+            </p>
             <div className="divider-light" />
             <span>
-              <Music2 size={19} /> {songs.length || 12}곡 ·{" "}
-              {songs.length ? durationLabel(totalTime(songs)) : "44분"}
+              <Music2 size={19} />{" "}
+              {commutePlaylist
+                ? `${commutePlaylist.trackCount}곡 · ${durationLabel(commutePlaylist.totalDurationSec)}`
+                : "아직 통근 플레이리스트가 없어요"}
             </span>
             <div className="equalizer">
               {[9, 15, 29, 20, 37, 23, 13, 33, 17, 30, 42, 18].map((n, i) => (
@@ -115,10 +137,18 @@ export default function Home() {
           </div>
           <button
             className="big-play"
-            onClick={() => playSong(songs[0]?.id || "seven")}
-            aria-label="출근길 플레이리스트 재생"
+            onClick={playCommute}
+            aria-label={
+              commutePlaylist
+                ? "출근길 플레이리스트 재생"
+                : "통근 플레이리스트 만들기"
+            }
           >
-            <Play size={38} strokeWidth={1.9} fill="#a7ed14" />
+            {commutePlaylist ? (
+              <Play size={38} strokeWidth={1.9} fill="#a7ed14" />
+            ) : (
+              <Plus size={38} strokeWidth={2.4} />
+            )}
           </button>
         </div>
       </XpPanel>
@@ -127,7 +157,9 @@ export default function Home() {
           <TopList
             songs={globalTop}
             isLoading={globalChart.isLoading}
-            errorMessage={globalChart.isError ? "차트를 불러오지 못했어요." : ""}
+            errorMessage={
+              globalChart.isError ? "차트를 불러오지 못했어요." : ""
+            }
           />
         </XpPanel>
         <XpPanel title="주변 인기곡 TOP 50" icon={MapPin}>
@@ -138,7 +170,6 @@ export default function Home() {
           />
         </XpPanel>
       </div>
-      <MusicPlayer />
     </div>
   );
 }

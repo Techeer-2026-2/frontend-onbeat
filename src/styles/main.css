@@ -2926,3 +2926,73 @@ body {
     height: 44px;
   }
 }
+
+/* 장소 검색 입력칸 (통근 경로) */
+.place-input {
+  position: relative;
+}
+.place-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #67b2dc;
+  border-radius: 10px;
+  background: linear-gradient(#ffffff, #eaf8ff);
+  box-shadow: 0 6px 14px rgba(8, 43, 106, 0.18);
+}
+.place-suggestions button {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #102652;
+  text-align: left;
+  cursor: pointer;
+}
+.place-suggestions button:hover,
+.place-suggestions button:focus-visible {
+  background: #d6f1ff;
+}
+.place-suggestions strong {
+  font-size: 12px;
+}
+.place-suggestions small {
+  font-size: 10px;
+  color: #5a7da3;
+}
+.place-status {
+  padding: 8px;
+  font-size: 11px;
+  color: #6080a0;
+}
+.commute-session-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.commute-session-actions .glass-btn {
+  flex: 1;
+}
+
+/* 재생 중인 곡이 없을 때 플레이어 바 */
+.music-player.is-empty .player-song-text {
+  opacity: 0.75;
+}
+.music-player.is-empty .player-controls button,
+.music-player.is-empty .player-favorite,
+.music-player.is-empty .player-progress input {
+  opacity: 0.45;
+  cursor: default;
+}

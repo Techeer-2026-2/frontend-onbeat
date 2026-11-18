@@ -14,7 +14,12 @@ export function useCurrentPosition(enable = true) {
     // 위치 가져오기
     navigator.geolocation.getCurrentPosition(
       (pos) =>
-        setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        setPosition({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracyMeters: pos.coords.accuracy, // 위치 저장 API에 필요
+          recordedAt: new Date(pos.timestamp).toISOString(),
+        }),
       () =>
         setError(
           "위치 정보를 가져오지 못했어요. 위치 권한을 허용했는지 확인해주세요.",
