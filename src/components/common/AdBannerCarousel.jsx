@@ -7,12 +7,12 @@ const SLIDE_DELAY = 4000;
 const SWIPE_THRESHOLD = 36;
 
 // banners: 앱 자체 프로모션 배너 (로컬 이미지)
-// 서버가 나에게 맞는 광고(/banners/match)를 주면 맨 앞에 끼워서 보여준다
+// 서버가 나에게 맞는 광고(/banners/match)를 주면 프로모션 배너 대신 그 광고만 보여준다
 export default function AdBannerCarousel({
   banners: promoBanners = homeAdBanners,
 }) {
   const { data: adBanner } = useMatchedBanner();
-  const banners = adBanner ? [adBanner, ...promoBanners] : promoBanners;
+  const banners = adBanner ? [adBanner] : promoBanners;
   const [index, setIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const startX = useRef(null);
@@ -29,8 +29,9 @@ export default function AdBannerCarousel({
   };
   // 자동 넘김: 넘어가는 중(isTransitioning)이 끝난 뒤에 다음 타이머를 건다
   // (예전에는 넘어가는 중인 상태를 기억한 채 타이머가 실행돼서 한 번 넘긴 뒤 멈췄음)
+  // 배너가 한 장뿐이면(광고만 있을 때) 넘길 곳이 없으므로 자동 넘김을 하지 않는다
   useEffect(() => {
-    if (isTransitioning) return undefined;
+    if (isTransitioning || banners.length < 2) return undefined;
     const timer = window.setTimeout(() => changeTo(index + 1), SLIDE_DELAY);
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- changeTo는 매번 새로 만들어지므로 제외
@@ -91,7 +92,16 @@ export default function AdBannerCarousel({
               }
             >
               {banner.image ? (
-                <img src={banner.image} alt={banner.alt} />
+                <>
+                  <img src={banner.image} alt={banner.alt} />
+                  {/* 서버 광고는 이미지 위에 제목·본문을 얹는다 (OnAd 미리보기와 같은 모습) */}
+                  {banner.isAd && banner.title && (
+                    <div className="ad-banner-caption">
+                      <strong>{banner.title}</strong>
+                      {banner.body && <span>{banner.body}</span>}
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="ad-banner-text">
                   <strong>{banner.title}</strong>
@@ -103,23 +113,26 @@ export default function AdBannerCarousel({
           ))}
         </div>
       </div>
-      <div
-        className="ad-banner-dots"
-        role="tablist"
-        aria-label="광고 배너 선택"
-      >
-        {banners.map((banner, dotIndex) => (
-          <button
-            key={banner.id}
-            type="button"
-            className={dotIndex === index ? "active" : ""}
-            onClick={() => changeTo(dotIndex)}
-            role="tab"
-            aria-selected={dotIndex === index}
-            aria-label={`${dotIndex + 1}번 배너 보기`}
-          />
-        ))}
-      </div>
+      {/* 배너가 두 장 이상일 때만 점 표시 */}
+      {banners.length > 1 && (
+        <div
+          className="ad-banner-dots"
+          role="tablist"
+          aria-label="광고 배너 선택"
+        >
+          {banners.map((banner, dotIndex) => (
+            <button
+              key={banner.id}
+              type="button"
+              className={dotIndex === index ? "active" : ""}
+              onClick={() => changeTo(dotIndex)}
+              role="tab"
+              aria-selected={dotIndex === index}
+              aria-label={`${dotIndex + 1}번 배너 보기`}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }
