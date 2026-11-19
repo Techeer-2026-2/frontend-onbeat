@@ -108,3 +108,36 @@
   font-size: 12px;
   color: #23507f;
 }
+
+/* 서버 광고 이미지 위 캡션: 아래쪽을 어둡게 깔아 어떤 이미지 위에서도 흰 글자가 읽히게 한다 */
+.ad-banner-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 12px 8px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.7),
+    rgba(0, 0, 0, 0.35) 55%,
+    transparent
+  );
+  color: #fff;
+  pointer-events: none;
+}
+.ad-banner-caption strong,
+.ad-banner-caption span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ad-banner-caption strong {
+  font-size: 14px;
+}
+.ad-banner-caption span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+}
