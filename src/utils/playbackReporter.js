@@ -48,8 +48,9 @@ export function startPlaybackReport(song, commuteSessionId) {
         recordPlaybackEvent({
           eventId: crypto.randomUUID(),
           sessionId,
-          // 팀 결정(29a06be): 30초 미리듣기를 끝까지 들어도 원곡 완주는 아니므로 SKIPPED로 보낸다
-          eventType: "TRACK_SKIPPED",
+          // 미리듣기를 끝까지 들으면 COMPLETED로 보내야 랭킹에 집계된다
+          // (서버 집계 조건: TRACK_COMPLETED && playedRatio >= 0.9, 백엔드 확인)
+          eventType: completed ? "TRACK_COMPLETED" : "TRACK_SKIPPED",
           playedRatio: completed ? 1 : playedRatio,
           occurredAt: new Date().toISOString(),
         }).catch(warn("재생 종료"));
