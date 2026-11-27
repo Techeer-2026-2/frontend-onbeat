@@ -5,7 +5,7 @@ import { MEMBER_ID } from "./member";
 const client = axios.create({
   baseURL: "/api/v1",
   timeout: 10000, // 10초 안에 응답이 없으면 실패 처리
-  // 실제 서버는 회원 번호를 쿼리(?memberId=)가 아니라 이 헤더로 확인한다 (문서와 다름)
+  // 회원 번호는 이 헤더로 보낸다 (백엔드 확인: ?memberId= 쿼리는 쓰지 않음)
   headers: { "X-Member-Id": String(MEMBER_ID) },
 });
 

@@ -1036,6 +1036,110 @@
         "security": [{ "bearerAuth": [] }]
       }
     },
+    "/api/v1/campaigns/{campaignId}/resume": {
+      "post": {
+        "tags": ["Campaign"],
+        "summary": "캠페인 재개",
+        "description": "일시정지한(PAUSED) 캠페인을 다시 진행한다. 일시정지 상태가 아니면 409.",
+        "operationId": "resumeCampaign",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "재개됨" },
+          "401": {
+            "description": "토큰이 없거나(AUTH_REQUIRED) 올바르지 않음(INVALID_TOKEN)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "내 캠페인이 아님",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "존재하지 않거나 삭제된 캠페인",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "409": {
+            "description": "일시정지 상태가 아닌 캠페인(CAMPAIGN_STATUS_CONFLICT)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/pause": {
+      "post": {
+        "tags": ["Campaign"],
+        "summary": "캠페인 일시정지",
+        "description": "진행중(ACTIVE) 캠페인을 일시정지한다. 일시정지 중에는 배너가 노출되지 않는다. 진행중이 아니면 409.",
+        "operationId": "pauseCampaign",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "일시정지됨" },
+          "401": {
+            "description": "토큰이 없거나(AUTH_REQUIRED) 올바르지 않음(INVALID_TOKEN)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "내 캠페인이 아님",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "존재하지 않거나 삭제된 캠페인",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "409": {
+            "description": "진행중이 아닌 캠페인(CAMPAIGN_STATUS_CONFLICT)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
     "/api/v1/auth/signup": {
       "post": {
         "tags": ["User Auth"],
@@ -2090,6 +2194,373 @@
         "security": [{ "bearerAuth": [] }]
       }
     },
+    "/api/v1/campaigns/{campaignId}/summary": {
+      "get": {
+        "tags": ["campaign-summary-controller"],
+        "summary": "캠페인 성과 AI 요약",
+        "description": "누적 노출·클릭·클릭률 숫자를 Claude 에 보내 한국어 요약 문장을 받는다. 서버에 ANTHROPIC_API_KEY 가 없으면 503 이다.",
+        "operationId": "summarize",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "요약 문장",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "토큰 없음 또는 올바르지 않음",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "내 캠페인이 아님",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "존재하지 않거나 삭제된 캠페인",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "502": {
+            "description": "Claude API 호출 실패 (AI_CALL_FAILED)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "503": {
+            "description": "AI 키가 설정되지 않음 (AI_NOT_CONFIGURED)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/stats/timeseries": {
+      "get": {
+        "tags": ["campaign-timeseries-controller"],
+        "summary": "캠페인 노출·클릭 추이 조회",
+        "description": "기간을 시간(hour) 또는 일(day) 단위로 나눈 노출·클릭·CTR 목록을 돌려준다. 기록이 없는 구간은 0이다. 기간을 생략하면 최근 7일, 단위를 생략하면 day.",
+        "operationId": "getTimeseries",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "구간별 추이 (시작 시각 오름차순)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CampaignTimeseriesBucket"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "기간 역전, 잘못된 단위, 구간 수 초과(INVALID_INPUT)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "토큰 없음 또는 올바르지 않음",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "내 캠페인이 아님",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "존재하지 않거나 삭제된 캠페인",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/stats/by-age": {
+      "get": {
+        "tags": ["campaign-age-stats-controller"],
+        "summary": "캠페인 연령대별 노출·클릭·CTR",
+        "description": "기간 안의 노출·클릭을 연령대(10s~50s)별로 나눠 CTR 을 돌려준다. 연령을 모르는 노출은 unknown 으로 따로 나온다. 기간을 생략하면 최근 7일.",
+        "operationId": "getByAge",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "연령대별 통계",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/CampaignAgeStats" }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "기간 역전(INVALID_INPUT)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "토큰 없음 또는 올바르지 않음",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "내 캠페인이 아님",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "존재하지 않거나 삭제된 캠페인",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/report/pdf": {
+      "get": {
+        "tags": ["campaign-pdf-controller"],
+        "summary": "캠페인 성과 리포트 PDF 다운로드",
+        "description": "날짜별 노출 수·클릭 수·CTR 을 PDF 파일로 돌려준다. 기간을 생략하면 최근 7일.",
+        "operationId": "downloadPdf",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PDF 파일 (attachment)",
+            "content": {
+              "application/json": {
+                "schema": { "type": "string", "format": "byte" }
+              }
+            }
+          },
+          "400": {
+            "description": "기간 역전, 구간 수 초과(INVALID_INPUT)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "토큰 없음 또는 올바르지 않음",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "내 캠페인이 아님",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "존재하지 않거나 삭제된 캠페인",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
+    "/api/v1/campaigns/{campaignId}/report/csv": {
+      "get": {
+        "tags": ["campaign-report-controller"],
+        "summary": "캠페인 성과 리포트 CSV 다운로드",
+        "description": "날짜별 노출 수·클릭 수·CTR 을 CSV 파일로 돌려준다. 기간을 생략하면 최근 7일. 엑셀에서 한글이 깨지지 않도록 UTF-8 BOM 을 붙인다.",
+        "operationId": "downloadCsv",
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "format": "date-time" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CSV 파일 (attachment)",
+            "content": {
+              "application/json": {
+                "schema": { "type": "string", "format": "byte" }
+              }
+            }
+          },
+          "400": {
+            "description": "기간 역전, 구간 수 초과(INVALID_INPUT)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "401": {
+            "description": "토큰 없음 또는 올바르지 않음",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "내 캠페인이 아님",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          },
+          "404": {
+            "description": "존재하지 않거나 삭제된 캠페인",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+              }
+            }
+          }
+        },
+        "security": [{ "bearerAuth": [] }]
+      }
+    },
     "/api/v1/campaigns/history": {
       "get": {
         "tags": ["Campaign History"],
@@ -2278,7 +2749,13 @@
           "title": { "type": "string", "maxLength": 256, "minLength": 0 },
           "artistName": { "type": "string", "maxLength": 256, "minLength": 0 },
           "previewUrl": { "type": "string", "maxLength": 2048, "minLength": 0 },
-          "externalUrl": { "type": "string", "maxLength": 2048, "minLength": 0 }
+          "externalUrl": {
+            "type": "string",
+            "maxLength": 2048,
+            "minLength": 0
+          },
+          "artworkUrl": { "type": "string", "maxLength": 2048, "minLength": 0 },
+          "trackTimeMillis": { "type": "integer", "format": "int32" }
         }
       },
       "DataTrack": {
@@ -2292,7 +2769,9 @@
           "title": { "type": "string" },
           "artistName": { "type": "string" },
           "previewUrl": { "type": "string" },
-          "externalUrl": { "type": "string" }
+          "externalUrl": { "type": "string" },
+          "artworkUrl": { "type": "string" },
+          "trackTimeMillis": { "type": "integer", "format": "int32" }
         }
       },
       "RouteEstimateRequest": {
@@ -3048,9 +3527,33 @@
             "format": "date-time",
             "description": "노출 종료 시각. 시작 시각보다 뒤여야 한다.",
             "example": "2026-10-10T18:00:00"
+          },
+          "totalBudget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "총 예산(원). 누적 소진액이 이 금액에 닿으면 노출이 멈춘다.",
+            "example": 100000
+          },
+          "bidPrice": {
+            "type": "integer",
+            "format": "int64",
+            "description": "입찰가(원). 노출 1회당 최대로 낼 금액이며 총 예산보다 클 수 없다. 실제 차감액은 경쟁 상황에 따라 이보다 작을 수 있다.",
+            "example": 50
+          },
+          "targetClicks": {
+            "type": "integer",
+            "format": "int64",
+            "description": "목표 클릭수",
+            "example": 300
           }
         },
-        "required": ["endAt", "startAt"]
+        "required": [
+          "bidPrice",
+          "endAt",
+          "startAt",
+          "targetClicks",
+          "totalBudget"
+        ]
       },
       "CampaignResponse": {
         "type": "object",
@@ -3100,6 +3603,11 @@
             "description": "진행 상태 (PENDING: 대기, ONGOING: 진행중, ENDED: 종료)",
             "enum": ["PENDING", "ONGOING", "ENDED"]
           },
+          "savedStatus": {
+            "type": "string",
+            "description": "저장된 운영 상태 (ACTIVE: 노출 가능, PAUSED: 일시정지, ENDED: 종료)",
+            "enum": ["DRAFT", "ACTIVE", "PAUSED", "ENDED"]
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -3115,6 +3623,36 @@
             "type": "integer",
             "format": "int64",
             "description": "클릭수 (목록 표용)",
+            "example": 300
+          },
+          "totalBudget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "총 예산(원)",
+            "example": 100000
+          },
+          "bidPrice": {
+            "type": "integer",
+            "format": "int64",
+            "description": "입찰가(원). 노출 1회당 최대 금액",
+            "example": 50
+          },
+          "spentTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "누적 소진액(원)",
+            "example": 32000
+          },
+          "remainingBudget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "남은 예산(원) = 총 예산 - 누적 소진액",
+            "example": 68000
+          },
+          "targetClicks": {
+            "type": "integer",
+            "format": "int64",
+            "description": "목표 클릭수",
             "example": 300
           }
         }
@@ -3303,7 +3841,7 @@
       },
       "CampaignUpdateRequest": {
         "type": "object",
-        "description": "캠페인 수정 요청. 바꿀 필드만 보낸다. 배너 이미지는 multipart 의 image 파트로 보낸다. 진행중인 캠페인은 title, body 와 이미지만 바꿀 수 있다.",
+        "description": "캠페인 수정 요청. 바꿀 필드만 보낸다. 배너 이미지는 multipart 의 image 파트로 보낸다. 진행중인 캠페인은 title, body 와 이미지만 바꿀 수 있다 (예산·입찰가·목표 클릭수는 대기 상태에서만).",
         "properties": {
           "title": {
             "type": "string",
@@ -3351,6 +3889,24 @@
             "format": "date-time",
             "description": "노출 종료 시각. 시작 시각보다 뒤여야 한다.",
             "example": "2026-10-10T18:00:00"
+          },
+          "totalBudget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "총 예산(원). 대기 상태에서만 바꿀 수 있다.",
+            "example": 100000
+          },
+          "bidPrice": {
+            "type": "integer",
+            "format": "int64",
+            "description": "입찰가(원). 대기 상태에서만 바꿀 수 있고 총 예산보다 클 수 없다.",
+            "example": 50
+          },
+          "targetClicks": {
+            "type": "integer",
+            "format": "int64",
+            "description": "목표 클릭수. 대기 상태에서만 바꿀 수 있다.",
+            "example": 300
           }
         }
       },
@@ -3402,6 +3958,11 @@
             "description": "진행 상태 (PENDING: 대기, ONGOING: 진행중, ENDED: 종료)",
             "enum": ["PENDING", "ONGOING", "ENDED"]
           },
+          "savedStatus": {
+            "type": "string",
+            "description": "저장된 운영 상태 (ACTIVE: 노출 가능, PAUSED: 일시정지, ENDED: 종료)",
+            "enum": ["DRAFT", "ACTIVE", "PAUSED", "ENDED"]
+          },
           "impressionCount": {
             "type": "integer",
             "format": "int64",
@@ -3413,6 +3974,48 @@
             "format": "int64",
             "description": "클릭수",
             "example": 300
+          },
+          "totalBudget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "총 예산(원)",
+            "example": 100000
+          },
+          "bidPrice": {
+            "type": "integer",
+            "format": "int64",
+            "description": "입찰가(원). 노출 1회당 최대 금액",
+            "example": 50
+          },
+          "spentTotal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "누적 소진액(원)",
+            "example": 32000
+          },
+          "remainingBudget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "남은 예산(원) = 총 예산 - 누적 소진액",
+            "example": 68000
+          },
+          "targetClicks": {
+            "type": "integer",
+            "format": "int64",
+            "description": "목표 클릭수",
+            "example": 300
+          },
+          "budgetUsageRate": {
+            "type": "number",
+            "format": "double",
+            "description": "예산 소진율(%) = 누적 소진액 ÷ 총 예산 × 100. 총 예산이 0이면 0",
+            "example": 32.0
+          },
+          "targetClickRate": {
+            "type": "number",
+            "format": "double",
+            "description": "목표 클릭 달성률(%) = 클릭수 ÷ 목표 클릭수 × 100. 목표가 0이면 0",
+            "example": 100.0
           },
           "createdAt": {
             "type": "string",
@@ -3527,6 +4130,100 @@
       "SseEmitter": {
         "type": "object",
         "properties": { "timeout": { "type": "integer", "format": "int64" } }
+      },
+      "CampaignSummaryResponse": {
+        "type": "object",
+        "description": "캠페인 성과 AI 요약",
+        "properties": {
+          "campaignId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "캠페인 ID",
+            "example": 10
+          },
+          "summary": {
+            "type": "string",
+            "description": "요약 문장 (한국어)",
+            "example": "노출 1,200회 중 클릭 300회로 클릭률은 25.00%입니다."
+          }
+        }
+      },
+      "CampaignTimeseriesBucket": {
+        "type": "object",
+        "description": "추이 그래프의 한 구간 (시간 또는 일)",
+        "properties": {
+          "bucketStart": {
+            "type": "string",
+            "format": "date-time",
+            "description": "구간 시작 시각",
+            "example": "2026-11-12T00:00:00"
+          },
+          "impressionCount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "노출 수",
+            "example": 120
+          },
+          "clickCount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "클릭 수",
+            "example": 8
+          },
+          "ctr": {
+            "type": "number",
+            "format": "double",
+            "description": "클릭률(%) = 클릭 ÷ 노출 × 100. 노출이 0이면 0",
+            "example": 6.67
+          },
+          "spentAmount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "소진액(원) = 이 구간 노출의 실제 차감액 합",
+            "example": 3720
+          },
+          "cpc": {
+            "type": "number",
+            "format": "double",
+            "description": "클릭당 비용(원) = 소진액 ÷ 클릭. 클릭이 0이면 0",
+            "example": 465.0
+          },
+          "cpm": {
+            "type": "number",
+            "format": "double",
+            "description": "노출 1000회당 비용(원) = 소진액 ÷ 노출 × 1000. 노출이 0이면 0",
+            "example": 31000.0
+          }
+        }
+      },
+      "CampaignAgeStats": {
+        "type": "object",
+        "description": "연령대별 노출·클릭·CTR",
+        "properties": {
+          "ageGroup": {
+            "type": "string",
+            "description": "연령대 (10s, 20s, 30s, 40s, 50s). 모르면 unknown",
+            "example": "20s"
+          },
+          "impressionCount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "노출 수",
+            "example": 120
+          },
+          "clickCount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "클릭 수",
+            "example": 8
+          },
+          "ctr": {
+            "type": "number",
+            "format": "double",
+            "description": "클릭률(%) = 클릭 ÷ 노출 × 100. 노출이 0이면 0",
+            "example": 6.67
+          }
+        }
       },
       "CampaignHistoryItem": {
         "type": "object",
