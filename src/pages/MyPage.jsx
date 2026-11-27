@@ -5,6 +5,7 @@ import XpPanel from "../components/common/XpPanel";
 import GlassButton from "../components/common/GlassButton";
 import ProfileEditModal from "../components/my/ProfileEditModal";
 import { useOnBeat } from "../context/OnBeatContext";
+import { logout } from "../api/auth";
 import { usePlaylists } from "../hooks/usePlaylists";
 import { useMainCommuteProfile } from "../hooks/useCommute";
 import { useMe } from "../hooks/useMe";
@@ -37,6 +38,14 @@ export default function MyPage() {
           {isMeLoading ? "불러오는 중..." : me?.nickname || "OnBeat 사용자"}
         </h2>
         <p className="my-sub">{demographics || "Music for Your Commute ♫"}</p>
+        <GlassButton
+          onClick={async () => {
+            await logout();
+            nav("/login", { replace: true });
+          }}
+        >
+          로그아웃
+        </GlassButton>
         {isMeError && <p className="my-hint">내 정보를 불러오지 못했어요.</p>}
         {me && !me.ageGroup && (
           <p className="my-hint">연령대를 입력하면 맞춤 광고를 받을 수 있어요.</p>

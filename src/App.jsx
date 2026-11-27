@@ -8,11 +8,20 @@ import CreatePlaylist from "./pages/CreatePlaylist";
 import CreateCommutePlaylist from "./pages/CreateCommutePlaylist";
 import MyPage from "./pages/MyPage";
 import Charts from "./pages/Charts";
+import Login from "./pages/Login";
+import RequireAuth from "./components/auth/RequireAuth";
 
 export default function App() {
   return (
     <Routes>
-      <Route element={<AppLayout />}>
+      <Route path="/login" element={<Login />} />
+      <Route
+        element={
+          <RequireAuth>
+            <AppLayout />
+          </RequireAuth>
+        }
+      >
         <Route index element={<Home />} />
         <Route path="/home" element={<Navigate to="/" replace />} />
         <Route path="/search" element={<Search />} />
