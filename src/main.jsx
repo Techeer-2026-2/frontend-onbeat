@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import { OnBeatProvider } from "./context/OnBeatContext";
+import { startClickQueueRetry } from "./api/bannerClickQueue";
 
 import "./styles/main.css";
 
@@ -20,3 +21,6 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// 실패해서 보관해 둔 배너 클릭을 앱 시작 때와 30초마다 다시 보낸다
+startClickQueueRetry();
