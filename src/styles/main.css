@@ -1934,6 +1934,74 @@ img {
 .my-sub {
   font-size: 12px;
 }
+.my-hint {
+  margin: 6px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: #0a5fa8;
+}
+.my-edit {
+  display: flex;
+  justify-content: center;
+  margin: 10px 0 4px;
+}
+/* 마이페이지 > 내 정보 수정 모달 */
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.profile-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #123d73;
+  font-size: 13px;
+  font-weight: 800;
+}
+.profile-field-group legend {
+  margin-bottom: 6px;
+  padding: 0;
+}
+.profile-input {
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+}
+.profile-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  color: #123d73;
+  font-size: 14px;
+}
+.chips button.selected {
+  border-color: #056acb;
+  background: linear-gradient(#7adcff, #0068eb 55%, #04a7ff);
+  color: #fff;
+  text-shadow: 0 1px 1px #00408a;
+}
+.profile-note {
+  margin: 0;
+  font-size: 11px;
+  color: #3a6a96;
+}
+.profile-error {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c0262d;
+}
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .my-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
