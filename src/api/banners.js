@@ -1,17 +1,13 @@
 import client from "./client";
-import { MEMBER_ID } from "./member";
 import { enqueueClick, isRetryable } from "./bannerClickQueue";
 
-// 광고 타겟 유저 번호: 회원(users)과 다른 target_users 테이블(연령대·성별)의 번호
-// .env에 VITE_TEST_TARGET_USER_ID가 없으면 회원 번호를 그대로 쓴다
-const TARGET_USER_ID = Number(import.meta.env.VITE_TEST_TARGET_USER_ID || MEMBER_ID);
-
 // 나에게 맞는 광고 배너 1개 (없으면 204 → 빈 응답)
+// 회원은 X-Member-Id 헤더(client.js가 자동으로 보냄)로 식별하고, 그 회원의 연령대·성별로 매칭한다
+// 연령대를 입력하지 않은 회원은 204(배너 없음)를 받는다
 // 호출할 때마다 서버가 "노출"을 기록하므로 자주 부르지 않는다
 // 요청 ID 는 호출마다 새로 만든다 (서버가 같은 ID 의 재시도를 한 번만 처리하도록)
 export const getMatchedBanner = () =>
   client.get("/banners/match", {
-    params: { targetUserId: TARGET_USER_ID },
     headers: { "X-Request-Id": crypto.randomUUID() },
   });
 
