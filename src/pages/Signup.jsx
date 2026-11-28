@@ -70,7 +70,11 @@ export default function Signup() {
         nickname: values.nickname,
         password: values.password,
       });
-      nav(redirectTo, { replace: true });
+      // 가입 완료 → 로그인 화면으로 (이메일은 미리 채우고, 로그인 후 원래 가려던 곳으로)
+      nav("/login", {
+        replace: true,
+        state: { email: values.email, signedUp: true, from: location.state?.from },
+      });
     } catch (err) {
       setIsPending(false);
       if (err.status === 409) {

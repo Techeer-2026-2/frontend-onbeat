@@ -22,10 +22,9 @@ export function useAuthActions() {
     setSession(tokens);
   };
 
-  // 가입 API 는 토큰을 주지 않으므로 가입 직후 같은 정보로 로그인한다
+  // 가입만 한다. 로그인은 로그인 화면에서 직접 한다
   const signup = async ({ email, password, nickname }) => {
     await signupApi({ email, password, nickname });
-    await login({ email, password });
   };
 
   const logout = async () => {

@@ -3148,3 +3148,14 @@ body {
   font-weight: 800;
   text-decoration: underline;
 }
+.auth-notice {
+  margin: 0 0 2px;
+  padding: 9px 12px;
+  border: 1px solid #3aa308;
+  border-radius: 12px;
+  background: linear-gradient(#f4ffe6, #dcf7bf);
+  color: #1f5c00;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}

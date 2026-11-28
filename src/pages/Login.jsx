@@ -10,6 +10,7 @@ export default function Login() {
   const location = useLocation();
   const session = useSession();
   const { login } = useAuthActions();
+  const justSignedUp = Boolean(location.state?.signedUp); // 회원가입 직후 넘어온 경우
   const [email, setEmail] = useState(location.state?.email ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -43,7 +44,13 @@ export default function Login() {
   return (
     <AuthLayout title="로그인 ♫" icon={LogIn}>
       <form className="auth-form" onSubmit={submit} noValidate>
-        <p className="auth-lead">통근길 음악, OnBeat 에 오신 걸 환영해요!</p>
+        {justSignedUp ? (
+          <p className="auth-notice" role="status">
+            회원가입이 완료됐어요. 로그인해 주세요.
+          </p>
+        ) : (
+          <p className="auth-lead">통근길 음악, OnBeat 에 오신 걸 환영해요!</p>
+        )}
         <AuthField
           label="이메일"
           icon={Mail}
@@ -52,7 +59,7 @@ export default function Login() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="listener@onbeat.com"
-          autoFocus
+          autoFocus={!justSignedUp}
         />
         <AuthField
           label="비밀번호"
@@ -62,6 +69,7 @@ export default function Login() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="비밀번호"
+          autoFocus={justSignedUp}
         />
         {error && (
           <p className="auth-error" role="alert">
