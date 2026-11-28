@@ -1,5 +1,5 @@
 {
-  "name": "spotify",
+  "name": "onbeat",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,8 +12,11 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.104.1",
+    "axios": "^1.20.0",
+    "lucide-react": "^1.55.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.4",
     "tailwindcss": "^4.3.3",
     "zustand": "^5.0.15"
   },

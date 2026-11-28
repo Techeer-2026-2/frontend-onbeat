@@ -1,0 +1,143 @@
+.ad-banner-carousel {
+  width: 100%;
+  min-width: 0;
+  margin: 1px 0 4px;
+}
+.ad-banner-viewport {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 3/1;
+  border: 3px solid #edffff;
+  border-radius: 17px;
+  background: linear-gradient(135deg, #b7f7ff, #4dbdea 50%, #d9fbff);
+  box-shadow:
+    0 0 0 1px #087ed2,
+    0 0 0 3px #9ceeff,
+    0 3px 7px rgba(11, 105, 165, 0.36),
+    inset 0 2px 2px #fff;
+  touch-action: pan-y;
+  user-select: none;
+}
+.ad-banner-track {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  transition: transform 450ms cubic-bezier(0.2, 0.72, 0.2, 1);
+  will-change: transform;
+}
+.ad-banner-slide {
+  display: block;
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.ad-banner-slide img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.ad-banner-dots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 0 2px;
+}
+.ad-banner-dots button {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 1px solid #379ac7;
+  border-radius: 50%;
+  background: linear-gradient(#ecffff, #8cd8f2);
+  box-shadow:
+    inset 0 1px 1px #fff,
+    0 1px 2px rgba(0, 75, 135, 0.28);
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+.ad-banner-dots button.active {
+  width: 22px;
+  border-radius: 8px;
+  border-color: #006bc3;
+  background: linear-gradient(#d9ffff, #50c7ff 30%, #0879df 72%, #0060c8);
+  box-shadow:
+    inset 0 1px 1px #fff,
+    inset 0 -1px 2px #00479b,
+    0 1px 3px #3c9bce;
+}
+.ad-banner-dots button:active {
+  transform: translateY(1px);
+}
+
+/* 서버 광고 슬라이드: "광고" 표시 + 이미지가 없을 때 글자 배너 */
+.ad-banner-slide.is-ad {
+  position: relative;
+}
+.ad-banner-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(8, 43, 106, 0.72);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  pointer-events: none;
+}
+.ad-banner-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 12px 16px;
+  color: #08295c;
+  pointer-events: none;
+}
+.ad-banner-text strong {
+  font-size: 16px;
+}
+.ad-banner-text span {
+  font-size: 12px;
+  color: #23507f;
+}
+
+/* 서버 광고 이미지 위 캡션: 아래쪽을 어둡게 깔아 어떤 이미지 위에서도 흰 글자가 읽히게 한다 */
+.ad-banner-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 12px 8px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.7),
+    rgba(0, 0, 0, 0.35) 55%,
+    transparent
+  );
+  color: #fff;
+  pointer-events: none;
+}
+.ad-banner-caption strong,
+.ad-banner-caption span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ad-banner-caption strong {
+  font-size: 14px;
+}
+.ad-banner-caption span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+}
