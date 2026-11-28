@@ -2,17 +2,15 @@ import { useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { login as loginApi, logout as logoutApi, signup as signupApi } from "../api/auth";
 import { clearSession, getSession, setSession, subscribeSession } from "../api/session";
-import { DEV_MEMBER_ID } from "../api/member";
 
 // 지금 로그인 상태 (토큰이 바뀌면 다시 그린다)
 export function useSession() {
   return useSyncExternalStore(subscribeSession, getSession);
 }
 
-// 로그인이 됐거나, 로컬 개발용 테스트 회원 ID 가 있으면 앱을 쓸 수 있다
+// 로그인 토큰이 있어야 앱을 쓸 수 있다 (로컬 개발도 동일)
 export function useIsAuthenticated() {
-  const session = useSession();
-  return Boolean(session) || Boolean(DEV_MEMBER_ID);
+  return Boolean(useSession());
 }
 
 export function useAuthActions() {

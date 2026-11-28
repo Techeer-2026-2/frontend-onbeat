@@ -1,5 +1,4 @@
 import axios from "axios";
-import { DEV_MEMBER_ID } from "./member";
 import { clearSession, getSession, setSession } from "./session";
 
 const BASE_URL = "/api/v1";
@@ -10,15 +9,12 @@ const client = axios.create({
   timeout: 10000, // 10초 안에 응답이 없으면 실패 처리
 });
 
-// 요청마다 로그인 토큰을 붙인다.
-// 로그인 전 로컬 개발에서만 .env 의 테스트 회원 ID 를 X-Member-Id 로 보낸다 (운영은 비어 있음)
+// 요청마다 로그인 토큰을 붙인다 (백엔드가 토큰에서 회원 ID 를 꺼낸다)
 client.interceptors.request.use((config) => {
   if (config.skipAuth) return config;
   const session = getSession();
   if (session) {
     config.headers.Authorization = `${session.tokenType} ${session.accessToken}`;
-  } else if (DEV_MEMBER_ID) {
-    config.headers["X-Member-Id"] = String(DEV_MEMBER_ID);
   }
   return config;
 });

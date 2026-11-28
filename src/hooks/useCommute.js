@@ -10,6 +10,7 @@ import {
   startCommuteSession,
   updateCommuteProfile,
 } from "../api/commute";
+import { useIsAuthenticated } from "./useAuth";
 import { generatePlaylist } from "../api/playlists";
 import {
   placeToLocationDto,
@@ -127,9 +128,12 @@ export function useGenerateCommutePlaylist() {
 }
 
 // 지금 진행 중인 통근 (없으면 서버가 404 → null)
+// 앱 전체를 감싸는 OnBeatContext 에서도 쓰므로, 로그인 화면에서는 요청하지 않는다
 export function useActiveCommuteSession() {
+  const isAuthenticated = useIsAuthenticated();
   return useQuery({
     queryKey: commuteKeys.activeSession,
+    enabled: isAuthenticated,
     queryFn: async () => {
       try {
         return await getActiveCommuteSession();
