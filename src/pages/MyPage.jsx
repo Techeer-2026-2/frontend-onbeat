@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserRound, Heart, Music2, TrainFront, Settings } from "lucide-react";
+import { UserRound, Heart, Music2, TrainFront, Settings, LogOut } from "lucide-react";
 import XpPanel from "../components/common/XpPanel";
 import GlassButton from "../components/common/GlassButton";
 import ProfileEditModal from "../components/my/ProfileEditModal";
@@ -8,6 +8,7 @@ import { useOnBeat } from "../context/OnBeatContext";
 import { usePlaylists } from "../hooks/usePlaylists";
 import { useMainCommuteProfile } from "../hooks/useCommute";
 import { useMe } from "../hooks/useMe";
+import { useAuthActions, useSession } from "../hooks/useAuth";
 import {
   AGE_GROUP_OPTIONS,
   GENDER_OPTIONS,
@@ -20,6 +21,12 @@ export default function MyPage() {
   const { profile } = useMainCommuteProfile();
   const { data: me, isLoading: isMeLoading, isError: isMeError } = useMe();
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const session = useSession();
+  const { logout } = useAuthActions();
+  const handleLogout = async () => {
+    await logout();
+    nav("/login", { replace: true });
+  };
   // 연령대·성별 중 있는 것만 "20대 · 여성"처럼 이어 붙인다
   const demographics = [
     labelOf(AGE_GROUP_OPTIONS, me?.ageGroup),
@@ -78,6 +85,11 @@ export default function MyPage() {
           <button onClick={() => nav("/map")}>
             <Heart /> 나의 통근 경로
           </button>
+          {session && (
+            <button onClick={handleLogout}>
+              <LogOut /> 로그아웃
+            </button>
+          )}
         </div>
       </XpPanel>
       {isEditOpen && me && (
