@@ -3159,3 +3159,32 @@ body {
   font-weight: 800;
   text-align: center;
 }
+.auth-chip-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #123d73;
+  font-size: 13px;
+  font-weight: 800;
+}
+.auth-chip-group legend {
+  margin-bottom: 6px;
+  padding: 0;
+}
+.auth-chip-group legend small {
+  color: #5a86b0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.auth-chip-group .chips button {
+  padding: 7px 12px;
+  font-size: 12px;
+}
+.auth-hint {
+  margin: -4px 0 0;
+  color: #3a6a96;
+  font-size: 11px;
+}

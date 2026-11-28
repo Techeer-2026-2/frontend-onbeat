@@ -4,6 +4,31 @@ import { UserPlus, Mail, Lock, UserRound } from "lucide-react";
 import AuthLayout, { AuthField } from "../components/auth/AuthLayout";
 import GlassButton from "../components/common/GlassButton";
 import { useAuthActions, useSession } from "../hooks/useAuth";
+import { AGE_GROUP_OPTIONS, GENDER_OPTIONS } from "../data/profileOptions";
+
+// 선택 입력(연령대·성별) 버튼 묶음. 같은 버튼을 다시 누르면 선택이 풀린다
+function OptionalChips({ label, options, value, onChange }) {
+  return (
+    <fieldset className="auth-chip-group">
+      <legend>
+        {label} <small>(선택)</small>
+      </legend>
+      <div className="chips">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={value === option.value ? "selected" : ""}
+            aria-pressed={value === option.value}
+            onClick={() => onChange(value === option.value ? null : option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
 
 // 백엔드 UserSignupRequest 검증 규칙과 맞춘다
 const EMAIL_MAX = 128;
@@ -43,6 +68,8 @@ export default function Signup() {
     password: "",
     passwordConfirm: "",
   });
+  const [ageGroup, setAgeGroup] = useState(null);
+  const [gender, setGender] = useState(null);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [isPending, setIsPending] = useState(false);
@@ -69,6 +96,8 @@ export default function Signup() {
         email: values.email,
         nickname: values.nickname,
         password: values.password,
+        ageGroup,
+        gender,
       });
       // 가입 완료 → 로그인 화면으로 (이메일은 미리 채우고, 로그인 후 원래 가려던 곳으로)
       nav("/login", {
@@ -131,6 +160,21 @@ export default function Signup() {
           placeholder="비밀번호를 한 번 더 입력"
           error={errors.passwordConfirm}
         />
+        <OptionalChips
+          label="연령대"
+          options={AGE_GROUP_OPTIONS}
+          value={ageGroup}
+          onChange={setAgeGroup}
+        />
+        <OptionalChips
+          label="성별"
+          options={GENDER_OPTIONS}
+          value={gender}
+          onChange={setGender}
+        />
+        <p className="auth-hint">
+          연령대를 선택하면 맞춤 광고 배너를 받을 수 있어요. 나중에 마이페이지에서도 바꿀 수 있어요.
+        </p>
         {serverError && (
           <p className="auth-error" role="alert">
             {serverError}

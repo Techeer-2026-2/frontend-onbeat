@@ -1,7 +1,8 @@
 import client from "./client";
 
 // 음악 앱 회원 인증 (백엔드 /api/v1/auth)
-// signup: { email, password, nickname } → { userId, email, nickname, createdAt } (토큰은 주지 않음)
+// signup: { email, password, nickname, ageGroup?, gender? } → { userId, email, nickname, createdAt } (토큰은 주지 않음)
+//  - ageGroup: "10s" | "20s" | "30s" | "40s" | "50s" (선택) / gender: "male" | "female" (선택)
 export const signup = (body) => client.post("/auth/signup", body, { skipAuth: true });
 
 // login: { email, password } → { accessToken, refreshToken, tokenType, expiresIn }

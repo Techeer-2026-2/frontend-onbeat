@@ -23,8 +23,12 @@ export function useAuthActions() {
   };
 
   // 가입만 한다. 로그인은 로그인 화면에서 직접 한다
-  const signup = async ({ email, password, nickname }) => {
-    await signupApi({ email, password, nickname });
+  // 연령대·성별은 선택 항목이라 고른 경우에만 보낸다
+  const signup = async ({ email, password, nickname, ageGroup, gender }) => {
+    const body = { email, password, nickname };
+    if (ageGroup) body.ageGroup = ageGroup;
+    if (gender) body.gender = gender;
+    await signupApi(body);
   };
 
   const logout = async () => {
