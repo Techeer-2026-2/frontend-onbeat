@@ -1,3 +1,5 @@
-// 로그인 연동 전까지는 .env의 테스트 회원 ID로 요청한다. (client.js가 X-Member-Id 헤더로 보냄)
-// JWT 로그인으로 바뀌면 이 파일과 client.js의 헤더만 고치면 된다.
-export const MEMBER_ID = Number(import.meta.env.VITE_TEST_MEMBER_ID || 1);
+// 로컬 개발용 임시 회원 ID.
+// 로그인하지 않은 상태에서 .env 의 VITE_TEST_MEMBER_ID 가 있을 때만 X-Member-Id 헤더로 보낸다.
+// 운영 빌드는 이 값을 비워 두므로 로그인(Authorization 헤더)이 필수다.
+const raw = import.meta.env.VITE_TEST_MEMBER_ID;
+export const DEV_MEMBER_ID = raw ? Number(raw) : null;
